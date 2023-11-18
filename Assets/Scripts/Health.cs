@@ -29,7 +29,8 @@ public class Health : NetworkBehaviour, ITakesDamage {
     } 
     
     [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(Vector3 force, float damage) {
+    public void TakeDamageServerRpc(float damage) {
         currentHealth.Value -= damage;
+        if (currentHealth.Value > maxHealth) currentHealth.Value = maxHealth;
     }
 }

@@ -20,7 +20,7 @@ public struct PlayerInfo : INetworkSerializable, IEquatable<PlayerInfo> {
 
     public bool Equals(PlayerInfo other) {
         return id == other.id &&
-                teamColor == other.teamColor &&
-                character == other.character;
+               teamColor == other.teamColor &&
+               character == other.character;
     }
 }

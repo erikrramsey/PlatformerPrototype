@@ -4,7 +4,7 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.UI;
 
-public class CreepMelee : NetworkBehaviour, ITakesDamage {
+public class CreepMelee : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     [SerializeField] private float maxHealth;
     [SerializeField] private float horizontalSpeed;
     [SerializeField] private float horizontalAccel;
@@ -101,12 +101,7 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage {
 
         Debug.Log("Creep trigger enter " + other.name + ' ' + gameObject.layer + ' ' + other.gameObject.layer);
         
-        other.GetComponent<ITakesDamage>().TakeDamageServerRpc(new Vector2(100.0f * transform.Find("Parts").localScale.x, 100.0f), meleeDamage);
-        var tryDebuff = other.GetComponent<ITakesDebuff>();
-        if (tryDebuff != null) {
-            tryDebuff.TakeDebuffServerRpc(Debuff.Stun, 1.0f, 0.0f);
-            tryDebuff.TakeDebuffServerRpc(Debuff.JumpSlow, 10.0f, -0.50f);
-        }
+        other.GetComponent<ITakesDamage>().TakeDamageServerRpc(meleeDamage);
     }
 
     IEnumerator AddCooldown(float seconds) {
@@ -116,11 +111,23 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage {
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(Vector3 direction, float damage) {
+    public void TakeDamageServerRpc(float damage) {
         Debug.Log("Creep taking damage" + OwnerClientId);
 
         currentHealth.Value -= damage;
-        _rigidbody.AddForce(direction);
+        if (currentHealth.Value > maxHealth) currentHealth.Value = maxHealth;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void TakeDebuffServerRpc(Debuff debuff, float duration, Vector3 value, bool isMult = false) {
+        switch (debuff) {
+            case Debuff.Knockback:
+                _rigidbody.AddForce(value);
+                break;
+            default:
+                Debug.LogError("Unhandled debuff " + debuff.ToString());
+                break;
+        }
     }
 
     [ServerRpc]

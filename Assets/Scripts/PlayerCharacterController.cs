@@ -80,6 +80,15 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""ShopMenu"",
+                    ""type"": ""Button"",
+                    ""id"": ""f2786ad6-c6c2-4b73-b906-e9c2c20d7424"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -225,6 +234,17 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
                     ""action"": ""EscMenu"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2f57cbdf-4cff-4e28-b8c2-a20d63e955c3"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""ShopMenu"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -239,6 +259,7 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
         m_PlayerCharacter_Jump = m_PlayerCharacter.FindAction("Jump", throwIfNotFound: true);
         m_PlayerCharacter_Skill3 = m_PlayerCharacter.FindAction("Skill3", throwIfNotFound: true);
         m_PlayerCharacter_EscMenu = m_PlayerCharacter.FindAction("EscMenu", throwIfNotFound: true);
+        m_PlayerCharacter_ShopMenu = m_PlayerCharacter.FindAction("ShopMenu", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -306,6 +327,7 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
     private readonly InputAction m_PlayerCharacter_Jump;
     private readonly InputAction m_PlayerCharacter_Skill3;
     private readonly InputAction m_PlayerCharacter_EscMenu;
+    private readonly InputAction m_PlayerCharacter_ShopMenu;
     public struct PlayerCharacterActions
     {
         private @PlayerCharacterController m_Wrapper;
@@ -316,6 +338,7 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
         public InputAction @Jump => m_Wrapper.m_PlayerCharacter_Jump;
         public InputAction @Skill3 => m_Wrapper.m_PlayerCharacter_Skill3;
         public InputAction @EscMenu => m_Wrapper.m_PlayerCharacter_EscMenu;
+        public InputAction @ShopMenu => m_Wrapper.m_PlayerCharacter_ShopMenu;
         public InputActionMap Get() { return m_Wrapper.m_PlayerCharacter; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -343,6 +366,9 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
             @EscMenu.started += instance.OnEscMenu;
             @EscMenu.performed += instance.OnEscMenu;
             @EscMenu.canceled += instance.OnEscMenu;
+            @ShopMenu.started += instance.OnShopMenu;
+            @ShopMenu.performed += instance.OnShopMenu;
+            @ShopMenu.canceled += instance.OnShopMenu;
         }
 
         private void UnregisterCallbacks(IPlayerCharacterActions instance)
@@ -365,6 +391,9 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
             @EscMenu.started -= instance.OnEscMenu;
             @EscMenu.performed -= instance.OnEscMenu;
             @EscMenu.canceled -= instance.OnEscMenu;
+            @ShopMenu.started -= instance.OnShopMenu;
+            @ShopMenu.performed -= instance.OnShopMenu;
+            @ShopMenu.canceled -= instance.OnShopMenu;
         }
 
         public void RemoveCallbacks(IPlayerCharacterActions instance)
@@ -390,5 +419,6 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
         void OnJump(InputAction.CallbackContext context);
         void OnSkill3(InputAction.CallbackContext context);
         void OnEscMenu(InputAction.CallbackContext context);
+        void OnShopMenu(InputAction.CallbackContext context);
     }
 }

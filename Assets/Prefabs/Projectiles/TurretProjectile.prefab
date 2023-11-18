@@ -362,6 +362,7 @@ MonoBehaviour:
   TimeToLive: 2.5
   baseDamage: 10
   speed: 5
+  knockback: {x: 2, y: -2, z: 0}
 --- !u!61 &-245179243928790033
 BoxCollider2D:
   m_ObjectHideFlags: 0

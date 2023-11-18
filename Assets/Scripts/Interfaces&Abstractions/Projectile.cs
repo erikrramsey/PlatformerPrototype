@@ -7,10 +7,14 @@ public abstract class Projectile : NetworkBehaviour {
     [SerializeField] protected float TimeToLive;
     [SerializeField] protected float baseDamage;
 
+    protected ulong ShooterClientId;
+    protected ClientRpcParams ownerParams;
+
     protected Transform target;
     protected Transform source;
     protected TeamColor teamColor;
     protected Rigidbody2D _rigidbody;
+
 
     #region UnityCallbacks
 
@@ -39,7 +43,7 @@ public abstract class Projectile : NetworkBehaviour {
 
     #endregion
 
-    public virtual void Setup(TeamColor _teamColor, Transform _target = null, Transform _source = null) {
+    public virtual void Setup(TeamColor _teamColor, Transform _target = null, Transform _source = null, ulong? id = null) {
         teamColor = _teamColor;
 
         if (teamColor == TeamColor.red) {
@@ -49,6 +53,15 @@ public abstract class Projectile : NetworkBehaviour {
         } else {
             Debug.LogError("No team color assigned to projectile: " + gameObject.name);
         }
+
+        if (id == null) id = OwnerClientId;
+
+        ownerParams = new ClientRpcParams {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[]{id.Value}
+            }
+        };
 
         target = _target;
         source = _source;
@@ -72,5 +85,9 @@ public abstract class Projectile : NetworkBehaviour {
         GetComponent<NetworkObject>().Despawn();
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    public void DespawnProjectileServerRpc() {
+        GetComponent<NetworkObject>().Despawn();
+    }
 
 }

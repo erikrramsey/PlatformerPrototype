@@ -23,20 +23,27 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     [SerializeField] protected AnimationClip JumpAnim;
 
     public NetworkVariable<TeamColor> teamColor = new NetworkVariable<TeamColor>();
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>();
+    public NetworkVariable<int> currentGold = new NetworkVariable<int>();
+
+    public HashSet<Item> Items = new HashSet<Item>();
     #endregion
 
-    protected NetworkVariable<float> currentHealth = new NetworkVariable<float>();
 
     private Camera _camera;
     protected Rigidbody2D _rigidbody;
     protected Animator _animator;
     private ClientNetworkAnimator _networkAnimator;
-    private GameOverlayUI _gameOverlayUI;
-    private Vector3 spawn;
-    private bool waitingForAnimationComplete;
+    protected bool waitingForAnimationComplete;
     private Dictionary<Debuff, float> debuffTimer = new Dictionary<Debuff, float>();
+    protected ClientRpcParams ownerParams;
 
+
+    protected bool skill1Ready;
     protected bool skill2Ready;
+    protected bool skill3Ready;
+
+    protected bool isAlive;
 
     protected class Inputs {
         public Vector2 movement = new Vector2(0.0f, 0.0f);
@@ -52,26 +59,35 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
     #region UnityCallbacks
     protected virtual void Awake() {
-        _stats.Initialize();
+
+        _rigidbody = GetComponent<Rigidbody2D>();
+        _animator = GetComponent<Animator>();
+        _networkAnimator = GetComponent<ClientNetworkAnimator>();
+        _camera = Camera.main;
+        _inputs = new Inputs();
+
     }
 
     protected virtual void Start()
     {
-        _rigidbody = GetComponent<Rigidbody2D>();
-        _animator = GetComponent<Animator>();
-        _networkAnimator = GetComponent<ClientNetworkAnimator>();
-        spawn = transform.position;
+        ownerParams = new ClientRpcParams {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[]{OwnerClientId}
+            }
+        };
 
         if (!IsOwner) return;
 
-
-        _camera = Camera.main;
-        _inputs = new Inputs();
+        skill1Ready = true;
         skill2Ready = true;
+        skill3Ready = true;
 
         // Input system
         _characterController = PlayerInput.Singleton.CharacterController;
         EnableInputCallbacks();
+
+        ShopOverlay.Singleton.localPlayer = this;
     }
 
     void OnEnable() {
@@ -108,6 +124,8 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
         _characterController.PlayerCharacter.EscMenu.performed += OnEscMenuPerformed;
         _characterController.PlayerCharacter.EscMenu.performed += OnEscMenuCanceled;
+
+        _characterController.PlayerCharacter.ShopMenu.performed += OnShopMenuPerformed;
     }
 
     private void OnMovementPerformed(InputAction.CallbackContext context) {
@@ -148,11 +166,6 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         Skill3Released();
     }
     
-    private void OnSkillCanceled(InputAction.CallbackContext context) {
-        Debug.LogError("attack 1 canceled (this shouldn't happen)");
-        _inputs.skill1 = context.ReadValue<float>() > 0.5f;
-    }
-
     private void OnJumpPerformed(InputAction.CallbackContext context) {
         _inputs.jump = context.ReadValue<float>() > 0.5f;
     }
@@ -169,10 +182,18 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
     private void OnEscMenuCanceled(InputAction.CallbackContext context) {
     }
+
+    private void OnShopMenuPerformed(InputAction.CallbackContext context) {
+        ShopOverlay.Singleton.gameObject.SetActive(!ShopOverlay.Singleton.gameObject.activeSelf);
+    }
+
+    private void OnShopMenuCanceled(InputAction.CallbackContext context) {
+    }
     #endregion
 
     void LateUpdate() {
         if (!IsOwner) return;
+        if (!isAlive) return;
 
         var cpos = _camera.transform.position;
 
@@ -184,9 +205,9 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         _camera.transform.position = cpos;
     }
 
-    void FixedUpdate() {
+    protected virtual void FixedUpdate() {
         if (!IsOwner) return;
-        if (waitingForAnimationComplete) return;
+        if (!isAlive) return;
 
         // Iterate through all debuffs and remove those that are done
         List<Debuff> completedDebuffs = new List<Debuff>();
@@ -203,29 +224,39 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
         completedDebuffs.Clear();
 
+
         var grounded = false;
 
         var rc = Physics2D.CircleCast(transform.position + Vector3.down, 0.4f, Vector2.down, 0.3f, LayerMask.GetMask(new[] {"Environment", "PTEnvironment"}));
         if (rc && _rigidbody.velocity.y < 0.1f) grounded = true;
 
+        if (_inputs.skill1) Skill1Held();
+        if (_inputs.skill2) Skill2Held();
+        if (_inputs.skill3) Skill3Held();
+
 
         if (_inputs.movement.x > 0.1f) {
             _animator.Play(WalkAnim.name);
-            _animator.Play("PlayerFlipRight", 1);
+
+            if (!waitingForAnimationComplete)
+                _animator.Play("PlayerFlipRight", 1);
             _rigidbody.AddForce(new Vector2(_stats.GetStat(StatType.HorizontalAccel), 0.0f));
         }
         if (_inputs.movement.x < -0.1f) {
             _animator.Play(WalkAnim.name);
-            _animator.Play("PlayerFlipLeft", 1);
+            if (!waitingForAnimationComplete)
+                _animator.Play("PlayerFlipLeft", 1);
             _rigidbody.AddForce(new Vector2(-_stats.GetStat(StatType.HorizontalAccel), 0.0f));
         }
 
 
-        if (Mathf.Abs(_rigidbody.velocity.x) > _stats.GetStat(StatType.HorizontalSpeed)) _rigidbody.velocity = new Vector3(Mathf.Sign(_rigidbody.velocity.x) * _stats.GetStat(StatType.HorizontalSpeed), _rigidbody.velocity.y, 0.0f);
+        if (Mathf.Abs(_rigidbody.velocity.x) > _stats.GetStat(StatType.HorizontalSpeed)) {
+            _rigidbody.velocity = new Vector3(_rigidbody.velocity.x / _stats.GetStat(StatType.HorizontalDecel), _rigidbody.velocity.y, 0.0f);
+        }
 
         if (grounded) {
             if (_inputs.movement.x == 0) {
-                _rigidbody.velocity = new Vector3(_rigidbody.velocity.x * 1 / _stats.GetStat(StatType.HorizontalDecel), _rigidbody.velocity.y, 0.0f);
+                _rigidbody.velocity = new Vector3(_rigidbody.velocity.x / _stats.GetStat(StatType.HorizontalDecel), _rigidbody.velocity.y, 0.0f);
                 _animator.Play(IdleAnim.name);
             }
 
@@ -247,8 +278,6 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
             _rigidbody.velocity = new Vector3(_rigidbody.velocity.x, _rigidbody.velocity.y / _stats.GetStat(StatType.JumpDampForce), 0.0f);
         }
 
-        if (_inputs.skill1) Skill1Held();
-        if (_inputs.skill2) Skill2Held();
     }
 
 
@@ -258,11 +287,12 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
             other.gameObject.layer == LayerMask.NameToLayer("BlueHurtbox"))) return;
 
         Debug.Log("Player trigger enter " + other.name + ' ' + gameObject.layer + ' ' + other.gameObject.layer);
-        var number = GameObject.Instantiate(damageNumber, other.transform.position + Vector3.up, Quaternion.identity);
-        number.GetComponent<DamageNumber>().SetDamage(10.0f);
         
-        other.GetComponent<ITakesDamage>().TakeDamageServerRpc(new Vector2(_attackObjects[0].knockback.x * transform.Find("Parts").localScale.x, _attackObjects[0].knockback.y), 10.0f);
+
+        OnEnemySkillHit(other);
     }
+
+    protected virtual void OnEnemySkillHit(Collider2D other) {}
 
 
     #endregion
@@ -272,71 +302,67 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     public override void OnNetworkSpawn() {
         teamColor.OnValueChanged += teamColor_OnValueChanged;
         currentHealth.OnValueChanged += currentHealth_OnValueChanged;
+        currentGold.OnValueChanged += currentGold_OnValueChanged;
 
-        if (currentHealth.Value > 0) {
-            currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
-        }
+        _stats.OnStatChange += RefreshStatsUIDisplay;
         
         if (!IsOwner) return;
-        GameplayManager.Singleton.OnGameEndEvent += OnGameEnd;
-        _gameOverlayUI = GameObject.FindObjectOfType<GameOverlayUI>();
-        _gameOverlayUI.setMaxHealth(_stats.GetStat(StatType.MaxHealth), _stats.GetStat(StatType.MaxHealth));
+        _stats.Initialize();
 
-        SetCurrentHealthServerRpc(_stats.GetStat(StatType.MaxHealth));
+        GameplayManager.Singleton.OnGameEndEvent += OnGameEnd;
+        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), _stats.GetStat(StatType.MaxHealth));
+
+        currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
+        currentGold_OnValueChanged(currentGold.Value, currentGold.Value);
     }
 
     #region NetVariableCallbacks
     void currentHealth_OnValueChanged(float previous, float current) {
+        Debug.Log(current);
         healthBarImage.rectTransform.localScale = new Vector3(currentHealth.Value / _stats.GetStat(StatType.MaxHealth), 1.0f, 1.0f);
         healthBarImage.uvRect = new Rect(0.0f, 0.0f, current / 20.0f, 1.0f);
 
         if (!IsOwner) return;
         if (current <= 0) {
-            transform.position = spawn;
-            _rigidbody.velocity = Vector2.zero;
-            SpawnServerRpc();
+            Die();
             return;
         }
 
-        _gameOverlayUI.setHealth(current);
+        GameOverlayUI.Singleton.setHealth(current);
     }
     
     public virtual void teamColor_OnValueChanged(TeamColor previous, TeamColor current) {
+        Color col = Color.white;
+        int layer = -1;
         if (current == TeamColor.red) {
             gameObject.layer = LayerMask.NameToLayer("RedHurtbox");
-
-            foreach (SpriteRenderer sp in transform.GetComponentsInChildren<SpriteRenderer>()) {
-                sp.color = Color.red;
-            }
+            layer = LayerMask.NameToLayer("RedHitbox");
+            col = Color.red;
         } else if (current == TeamColor.blue) {
             gameObject.layer = LayerMask.NameToLayer("BlueHurtbox");
+            layer = LayerMask.NameToLayer("BlueHitbox");
+            col = Color.blue;
+        }
 
-            foreach (SpriteRenderer sp in transform.GetComponentsInChildren<SpriteRenderer>()) {
-                sp.color = Color.blue;
+        foreach (SpriteRenderer sp in transform.GetComponentsInChildren<SpriteRenderer>(true)) {
+            sp.color = col;
+            var hb = sp.GetComponent<Collider2D>();
+            if (hb) {
+                hb.gameObject.layer = layer;
             }
         }
+    }
+
+    public virtual void currentGold_OnValueChanged(int previous, int current) {
+        GameOverlayUI.Singleton.setGold(current);
     }
     #endregion
 
     #region RPC's
     [ServerRpc]
-    public virtual void SpawnProjectileServerRpc(int index, Vector3 direction) {
-        var obj = GameObject.Instantiate(_attackObjects[index].projectile, transform.position, Quaternion.identity).GetComponent<Projectile>();
-        obj.GetComponent<NetworkObject>().SpawnWithOwnership(OwnerClientId);
-    }
-
-    [ServerRpc]
-    private void SpawnServerRpc() {
-        transform.position = spawn;
-        currentHealth.Value = _stats.GetStat(StatType.MaxHealth);
-        gameObject.SetActive(true);
-    }
-
-    [ServerRpc]
     public void SetCurrentHealthServerRpc(float health) {
         currentHealth.Value = health;
     }
-
 
     [ClientRpc]
     public void SetPositionClientRpc(Vector3 position) {
@@ -345,7 +371,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(Vector3 force, float damage) {
+    public void TakeDamageServerRpc(float damage) {
         Debug.Log("taking damage" + OwnerClientId);
         ClientRpcParams clientRpcParams = new ClientRpcParams {
             Send = new ClientRpcSendParams
@@ -355,7 +381,10 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         };
 
         currentHealth.Value -= damage;
-        TakeDamageClientRpc(force, damage, clientRpcParams);
+        if (currentHealth.Value > _stats.GetStat(StatType.MaxHealth)) {
+            currentHealth.Value = _stats.GetStat(StatType.MaxHealth);
+        }
+        TakeDamageClientRpc(damage, clientRpcParams);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -367,6 +396,22 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
             }
         };
         TakeDebuffClientRpc(debuff, duration, value, isMult, clientRpcParams);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void TakeDebuffServerRpc(Debuff debuff, float duration, Vector3 value, bool isMult = false) {
+        ClientRpcParams clientRpcParams = new ClientRpcParams {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[]{OwnerClientId}
+            }
+        };
+        TakeDebuffClientRpc(debuff, duration, value, isMult, clientRpcParams);
+    }
+
+    [ServerRpc]
+    public void DespawnServerRpc() {
+        GetComponent<NetworkObject>().Despawn();
     }
     
     [ClientRpc]
@@ -384,8 +429,10 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
                 StartCoroutine(performActionAfterCondition(() => {
                     return debuffTimer.ContainsKey(debuff) && debuffTimer[debuff] > 0.0f;
                 }, () => {
+                    _stats.AddToAddMod(StatType.HorizontalSpeed, 100);
                     _characterController.Disable();
                 }, () => {
+                    _stats.AddToAddMod(StatType.HorizontalSpeed, -100);
                     _characterController.Enable();
                 }));
                 break;
@@ -405,11 +452,21 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     }
 
     [ClientRpc]
-    public void TakeDamageClientRpc(Vector3 force, float damage, ClientRpcParams p = default) {
+    public void TakeDebuffClientRpc(Debuff debuff, float duration, Vector3 value, bool isMult = false, ClientRpcParams p = default) {
+        switch (debuff) {
+            case Debuff.Knockback:
+                _rigidbody.AddForce(value);
+                break;
+            default:
+                Debug.LogError("Unhandled debuff " + debuff.ToString());
+                break;
+        }
+    }
+
+    [ClientRpc]
+    public void TakeDamageClientRpc(float damage, ClientRpcParams p = default) {
         var number = GameObject.Instantiate(takeDamageNumber, transform.position + Vector3.up, Quaternion.identity);
-        number.GetComponent<DamageNumber>().SetDamage(10.0f);
-        
-        _rigidbody.AddForce(force);
+        number.GetComponent<DamageNumber>().SetDamage(damage);
     }
 
     #endregion
@@ -444,6 +501,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
     protected IEnumerator performActionAfterCondition(Func<bool> testCondition, Action first, Action second) {
         first();
+        yield return new WaitForEndOfFrame();
         while (testCondition()) yield return null;
         second();
     }
@@ -462,6 +520,29 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         }
     }
 
+    protected void CooldownSkill(int skill) {
+        switch (skill) {
+            case 1:
+                StartCoroutine(performTimedAction(_stats.GetStat(StatType.Skill1Cooldown), () => skill1Ready = false, () => skill1Ready = true));
+            return;
+            case 2:
+                StartCoroutine(performTimedAction(_stats.GetStat(StatType.Skill2Cooldown), () => skill2Ready = false, () => skill2Ready = true));
+            return;
+            case 3:
+                StartCoroutine(performTimedAction(_stats.GetStat(StatType.Skill3Cooldown), () => skill3Ready = false, () => skill3Ready = true));
+            return;
+            default:
+                Debug.LogError("Invalid skill cooldown: " + skill);
+            return;
+        }
+    }
+    
+    protected Vector2 GetNormalizedAim() {
+        var dir = (Vector2)Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());
+        return (dir - (Vector2)transform.position).normalized;
+    }
+
+
     // Used for stuns / ability overrides
     protected void DisableInputs() {
         _characterController.Disable();
@@ -473,6 +554,31 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
     protected void OnGameEnd(TeamColor loser) {
         _characterController.Disable();
+    }
+
+    [ClientRpc]
+    public void SpawnClientRpc(ClientRpcParams rpcParams = default) {
+        isAlive = true;
+        transform.position = GameplayManager.Singleton.GetSpawn(teamColor.Value).position;
+        SetCurrentHealthServerRpc(_stats.GetStat(StatType.MaxHealth));
+    }
+
+    protected void Die() {
+        isAlive = false;
+    }
+
+    public void AddItem(Item item) {
+        Items.Add(item);
+        foreach (var st in item.affectedStats) {
+            _stats.AddToAddMod(st.Type, st.Value);
+        }
+
+        RefreshStatsUIDisplay();
+    }
+
+    public void RefreshStatsUIDisplay() {
+        currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
+        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), currentHealth.Value);
     }
 
     #endregion

@@ -96,10 +96,10 @@ public class Fatty : PlayerCharacter {
 
     protected override void Skill2Released() {
         if (!skill2Ready) return;
+        CooldownSkill(2);
+
         float flip = Mathf.Sign((Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue()) - transform.position).x);
         Skill2ServerRpc(flip);
-
-        StartCoroutine(performTimedAction(_stats.GetStat(StatType.Skill2Cooldown), () => { skill2Ready = false; }, () => { skill2Ready = true; }));
     }
 
     [ServerRpc]

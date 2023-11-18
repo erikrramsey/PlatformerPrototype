@@ -5,11 +5,13 @@ using Unity.Netcode;
 
 public class TurretProjectile : Projectile {
     [SerializeField] private float speed;
+    [SerializeField] private Vector3 knockback;
 
     public void FixedUpdate() {
         if (!IsServer) return;
         if (target == null) {
-            GameObject.Destroy(this.gameObject);
+            //GameObject.Destroy(this.gameObject);
+            GetComponent<NetworkObject>().Despawn();
             return;
         }
 
@@ -19,12 +21,15 @@ public class TurretProjectile : Projectile {
     protected override void OnEnemyCollision(Collider2D other) {
         Debug.Log("Turret trigger enter " + other.name + ' ' + gameObject.layer + ' ' + other.gameObject.layer);
 
-        float dir = 0.0f;
-        if (source != null) dir = Mathf.Sign(transform.position.x - source.position.x);
-        var d = other.GetComponent<ITakesDamage>();
-
         if (IsSpawned) GetComponent<NetworkObject>().Despawn();
 
-        d.TakeDamageServerRpc(new Vector2(80.0f * dir, 80.0f), baseDamage);
+        float dir = 0.0f;
+        if (source != null) dir = Mathf.Sign(transform.position.x - source.position.x);
+        var deb = other.GetComponent<ITakesDebuff>();
+        var dam = other.GetComponent<ITakesDamage>();
+
+
+        deb?.TakeDebuffServerRpc(Debuff.Knockback, 0, knockback / Time.fixedDeltaTime * dir);
+        dam?.TakeDamageServerRpc(baseDamage);
     }
 }

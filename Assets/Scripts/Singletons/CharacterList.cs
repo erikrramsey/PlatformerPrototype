@@ -6,6 +6,7 @@ public enum Character {
     fatty = 1,
     pingpong = 2,
     bass,
+    healer,
 }
 
 public class CharacterList : MonoBehaviour {

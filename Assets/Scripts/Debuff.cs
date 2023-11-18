@@ -6,6 +6,7 @@ public enum Debuff {
 
     Stun,
     JumpSlow,
+    Knockback,
 }
 
 public class DebuffList : MonoBehaviour {

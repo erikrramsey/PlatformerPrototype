@@ -151,7 +151,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isTTL: 1
-  TimeToLive: 2
+  TimeToLive: 108.94
   baseDamage: 0
 --- !u!120 &8370531711731813309
 LineRenderer:

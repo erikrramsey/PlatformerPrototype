@@ -57,9 +57,10 @@ public class Turret : NetworkBehaviour, ITakesDamage {
     }
     
     [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(Vector3 direction, float damage) {
+    public void TakeDamageServerRpc(float damage) {
         Debug.Log("Turret taking damage" + OwnerClientId);
         currentHealth.Value -= damage;
+        if (currentHealth.Value > maxHealth) currentHealth.Value = maxHealth;
     }
 
     IEnumerator ShotCooldown() {
