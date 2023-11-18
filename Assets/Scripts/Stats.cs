@@ -1,48 +1,53 @@
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+
+public enum StatType {
+    HorizontalSpeed,
+    HorizontalAccel,
+    HorizontalDecel,
+    JumpForce,
+    MaxHealth,
+    JumpDampForce,
+    Skill1Cooldown,
+    Skill2Cooldown,
+}
 
 [System.Serializable]
 public class Stats {
-    [SerializeField] public float baseHorizontalSpeed = 0.0f;
-    [SerializeField] public float baseHorizontalAccel = 0.0f;
-    [SerializeField] public float baseHorizontalDecel = 0.0f;
-    [SerializeField] public float baseJumpForce = 0.0f;
-    [SerializeField] public float baseMaxHealth = 0.0f;
-    [SerializeField] public float baseJumpDampForce = 0.0f;
-
-    [SerializeField] public float horizontalSpeedModifier = 1.0f;
-    [SerializeField] public float horizontalAccelModifier = 1.0f;
-    [SerializeField] public float horizontalDecelModifier = 1.0f;
-    [SerializeField] public float jumpForceModifier = 1.0f;
-    [SerializeField] public float maxHealthModifier = 1.0f;
-    [SerializeField] public float jumpDampForceModifier = 1.0f;
-
-    public float HorizontalSpeed { get {
-        return baseHorizontalSpeed * horizontalSpeedModifier;
+    [System.Serializable]
+    private struct statValue {
+        public StatType type;
+        public float value;
     }
-    private set {} }
 
-    public float HorizontalAccel { get {
-        return baseHorizontalAccel * horizontalAccelModifier;
-    }
-    private set {} }
+    [SerializeField] private List<statValue> baseStatsSerialized;
 
-    public float HorizontalDecel { get {
-        return baseHorizontalDecel * horizontalDecelModifier;
-    }
-    private set {} }
+    Dictionary<StatType, float> baseStats = new Dictionary<StatType, float>();
+    Dictionary<StatType, float> multiModifiers = new Dictionary<StatType, float>();
+    Dictionary<StatType, float> addModifiers = new Dictionary<StatType, float>();
 
-    public float JumpForce { get {
-        return baseJumpForce * jumpForceModifier;
+    public void Initialize() {
+        foreach (var stat in baseStatsSerialized) {
+            baseStats.Add(stat.type, stat.value);
+            multiModifiers.Add(stat.type, 1.0f);
+            addModifiers.Add(stat.type, 0.0f);
+        }
     }
-    private set {} }
 
-    public float MaxHealth { get {
-        return baseMaxHealth * maxHealthModifier;
+    public float GetStat(StatType type) {
+        return (baseStats[type] + addModifiers[type]) * multiModifiers[type];
     }
-    private set {} }
 
-    public float JumpDampForce { get {
-        return baseJumpDampForce * jumpDampForceModifier;
+    public void AddToAddMod(StatType type, float value) {
+        addModifiers[type] += value;
     }
-    private set {} }
+
+    public void AddToMultiMod(StatType type, float value) {
+        multiModifiers[type] += value;
+    }
+
+    public float GetBaseStat(StatType type) { return baseStats[type]; }
+    public float GetMulti(StatType type) { return multiModifiers[type]; }
+    public float GetAdd(StatType type) { return addModifiers[type]; }
 }

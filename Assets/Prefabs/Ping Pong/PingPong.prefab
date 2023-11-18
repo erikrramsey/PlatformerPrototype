@@ -230,29 +230,33 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _stats:
-    baseHorizontalSpeed: 6
-    baseHorizontalAccel: 30
-    baseHorizontalDecel: 1.3
-    baseJumpForce: 750
-    baseMaxHealth: 100
-    baseJumpDampForce: 1.07
-    horizontalSpeedModifier: 1
-    horizontalAccelModifier: 1
-    horizontalDecelModifier: 1
-    jumpForceModifier: 1
-    maxHealthModifier: 1
-    jumpDampForceModifier: 1
+    baseStatsSerialized:
+    - type: 0
+      value: 6
+    - type: 1
+      value: 30
+    - type: 2
+      value: 1.3
+    - type: 3
+      value: 750
+    - type: 4
+      value: 100
+    - type: 5
+      value: 1.07
+    - type: 6
+      value: 0
+    - type: 7
+      value: 2
   _attackObjects:
   - {fileID: 11400000, guid: 812654c400d2b654fabffe40d4f96456, type: 2}
   damageNumber: {fileID: 1788189728207962769, guid: 44a1206197022ca40bdaa7e19917f368, type: 3}
+  takeDamageNumber: {fileID: 0}
   healthBarImage: {fileID: 3801129022151319002}
   IdleAnim: {fileID: 7400000, guid: 2d2ca8d8d106dc14a8111b891ad689ee, type: 2}
   WalkAnim: {fileID: 7400000, guid: a9873b030f86d7444bde774421629758, type: 2}
   JumpAnim: {fileID: 7400000, guid: a9873b030f86d7444bde774421629758, type: 2}
-  currentHealth:
-    m_InternalValue: 0
   teamColor:
-    m_InternalValue: {r: 0, g: 0, b: 0, a: 0}
+    m_InternalValue: 0
 --- !u!1 &3666101263559264231
 GameObject:
   m_ObjectHideFlags: 0

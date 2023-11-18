@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 7053338226774086135}
   - component: {fileID: 404019419433211167}
   - component: {fileID: 1793721017746959705}
-  - component: {fileID: 627252432389850825}
+  - component: {fileID: 6201938160207655550}
   m_Layer: 0
   m_Name: FattySkill2Projectile
   m_TagString: Untagged
@@ -53,7 +53,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDrag: 0
   m_AngularDrag: 0.05
-  m_GravityScale: 1.5
+  m_GravityScale: 0
   m_Material: {fileID: 0}
   m_Interpolate: 0
   m_SleepingMode: 1
@@ -137,7 +137,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80d7c879794dfda4687da0e400131852, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &627252432389850825
+--- !u!114 &6201938160207655550
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -146,9 +146,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 5226937430870516751}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 172cd97af2532184696560f2a133f23c, type: 3}
+  m_Script: {fileID: 11500000, guid: 7fbaa24a111d5a54f9523daa9647db38, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isTTL: 1
+  TimeToLive: 3
+  baseDamage: 3
 --- !u!1 &5957444875355952313
 GameObject:
   m_ObjectHideFlags: 0
@@ -191,6 +194,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8552292680098298509}
   - component: {fileID: 514880826380059224}
+  - component: {fileID: 3264184021872914508}
   m_Layer: 0
   m_Name: Circle
   m_TagString: Untagged
@@ -265,3 +269,18 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!114 &3264184021872914508
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8778164713478218858}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fbaa24a111d5a54f9523daa9647db38, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isTTL: 0
+  TimeToLive: 0
+  baseDamage: 0

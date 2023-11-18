@@ -16,13 +16,13 @@ public class TeamPickUIController : MonoBehaviour {
 
     void Start() {
         redButton.onClick.AddListener(() => {
-            GameManager.Singleton.localPlayer.SetTeamServerRpc(TeamColor.red);
+            //GameplayManager.Singleton.localPlayer.SetTeamServerRpc(TeamColor.red);
             nextUI.gameObject.SetActive(true);
             gameObject.SetActive(false);
         });
 
         blueButton.onClick.AddListener(() => {
-            GameManager.Singleton.localPlayer.SetTeamServerRpc(TeamColor.blue);
+            //GameplayManager.Singleton.localPlayer.SetTeamServerRpc(TeamColor.blue);
             nextUI.gameObject.SetActive(true);
             gameObject.SetActive(false);
         });

@@ -62,6 +62,24 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Skill3"",
+                    ""type"": ""Button"",
+                    ""id"": ""da8573f9-a832-4ca4-ac3b-fb55d745a750"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""EscMenu"",
+                    ""type"": ""Button"",
+                    ""id"": ""4dfdb562-5313-4103-91be-c329b6611575"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -185,6 +203,28 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
                     ""action"": ""Skill2"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c08377e6-137e-4b80-952e-19be2b725a67"",
+                    ""path"": ""<Mouse>/middleButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Skill3"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""ed01abb3-4e50-49e6-9119-3b295130f05b"",
+                    ""path"": ""<Keyboard>/escape"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""EscMenu"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -197,6 +237,8 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
         m_PlayerCharacter_Skill1 = m_PlayerCharacter.FindAction("Skill1", throwIfNotFound: true);
         m_PlayerCharacter_Skill2 = m_PlayerCharacter.FindAction("Skill2", throwIfNotFound: true);
         m_PlayerCharacter_Jump = m_PlayerCharacter.FindAction("Jump", throwIfNotFound: true);
+        m_PlayerCharacter_Skill3 = m_PlayerCharacter.FindAction("Skill3", throwIfNotFound: true);
+        m_PlayerCharacter_EscMenu = m_PlayerCharacter.FindAction("EscMenu", throwIfNotFound: true);
     }
 
     public void Dispose()
@@ -262,6 +304,8 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
     private readonly InputAction m_PlayerCharacter_Skill1;
     private readonly InputAction m_PlayerCharacter_Skill2;
     private readonly InputAction m_PlayerCharacter_Jump;
+    private readonly InputAction m_PlayerCharacter_Skill3;
+    private readonly InputAction m_PlayerCharacter_EscMenu;
     public struct PlayerCharacterActions
     {
         private @PlayerCharacterController m_Wrapper;
@@ -270,6 +314,8 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
         public InputAction @Skill1 => m_Wrapper.m_PlayerCharacter_Skill1;
         public InputAction @Skill2 => m_Wrapper.m_PlayerCharacter_Skill2;
         public InputAction @Jump => m_Wrapper.m_PlayerCharacter_Jump;
+        public InputAction @Skill3 => m_Wrapper.m_PlayerCharacter_Skill3;
+        public InputAction @EscMenu => m_Wrapper.m_PlayerCharacter_EscMenu;
         public InputActionMap Get() { return m_Wrapper.m_PlayerCharacter; }
         public void Enable() { Get().Enable(); }
         public void Disable() { Get().Disable(); }
@@ -291,6 +337,12 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
             @Jump.started += instance.OnJump;
             @Jump.performed += instance.OnJump;
             @Jump.canceled += instance.OnJump;
+            @Skill3.started += instance.OnSkill3;
+            @Skill3.performed += instance.OnSkill3;
+            @Skill3.canceled += instance.OnSkill3;
+            @EscMenu.started += instance.OnEscMenu;
+            @EscMenu.performed += instance.OnEscMenu;
+            @EscMenu.canceled += instance.OnEscMenu;
         }
 
         private void UnregisterCallbacks(IPlayerCharacterActions instance)
@@ -307,6 +359,12 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
             @Jump.started -= instance.OnJump;
             @Jump.performed -= instance.OnJump;
             @Jump.canceled -= instance.OnJump;
+            @Skill3.started -= instance.OnSkill3;
+            @Skill3.performed -= instance.OnSkill3;
+            @Skill3.canceled -= instance.OnSkill3;
+            @EscMenu.started -= instance.OnEscMenu;
+            @EscMenu.performed -= instance.OnEscMenu;
+            @EscMenu.canceled -= instance.OnEscMenu;
         }
 
         public void RemoveCallbacks(IPlayerCharacterActions instance)
@@ -330,5 +388,7 @@ public partial class @PlayerCharacterController: IInputActionCollection2, IDispo
         void OnSkill1(InputAction.CallbackContext context);
         void OnSkill2(InputAction.CallbackContext context);
         void OnJump(InputAction.CallbackContext context);
+        void OnSkill3(InputAction.CallbackContext context);
+        void OnEscMenu(InputAction.CallbackContext context);
     }
 }

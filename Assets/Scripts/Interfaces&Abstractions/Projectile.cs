@@ -1,10 +1,16 @@
+using System.Collections;
 using UnityEngine;
 using Unity.Netcode;
 
 public abstract class Projectile : NetworkBehaviour {
+    [SerializeField] protected bool isTTL;
+    [SerializeField] protected float TimeToLive;
+    [SerializeField] protected float baseDamage;
+
     protected Transform target;
     protected Transform source;
     protected TeamColor teamColor;
+    protected Rigidbody2D _rigidbody;
 
     #region UnityCallbacks
 
@@ -46,9 +52,25 @@ public abstract class Projectile : NetworkBehaviour {
 
         target = _target;
         source = _source;
+        _rigidbody = GetComponent<Rigidbody2D>();
+        
+        if (isTTL) StartCoroutine(BeginTTL());
     }
 
     protected virtual void OnEnemyCollision(Collider2D other) {}
+
+    public virtual void SetDamage(float _damage) {
+        baseDamage = _damage;
+    }
+
+    public virtual void SetInitialForce(Vector2 force) {
+        _rigidbody.AddForce(force);
+    }
+
+    protected IEnumerator BeginTTL() {
+        yield return new WaitForSeconds(TimeToLive);
+        GetComponent<NetworkObject>().Despawn();
+    }
 
 
 }

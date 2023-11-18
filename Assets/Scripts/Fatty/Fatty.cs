@@ -8,17 +8,23 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(LineRenderer))]
 public class Fatty : PlayerCharacter {
 
-    [Header("Attack 1 Stuff")]
+    [Header("Skill 1 Stuff")]
     [SerializeField] private float MaxChargeTime;
     [SerializeField] private float MinChargeTime;
     [SerializeField] private float MaxRange;
-    [SerializeField] private float Attack1Angle;
+    [SerializeField] private float Skill1Angle;
     [SerializeField] private float ChargeSlowDown;
     [SerializeField] private int arcResolution;
     [SerializeField] private float Attack1GravityScale;
-
     [SerializeField] private Image ChargeBar;
     [SerializeField] private RawImage ChargeImage;
+
+    [Header("Skill 2 Stuff")]
+    [SerializeField] private Vector2 Skill2Velocity;
+
+    [Header("Skill 3 Stuff")]
+    [SerializeField] private float Skill3Force;
+    [SerializeField] private float Skill3Duration;
 
 
     private float currentChargeTime = 0.0f;
@@ -33,14 +39,14 @@ public class Fatty : PlayerCharacter {
         base.Start();
     }
 
-    public override void Skill1Pressed() {
-        _stats.horizontalSpeedModifier -= ChargeSlowDown;
+    protected override void Skill1Pressed() {
+        _stats.AddToMultiMod(StatType.HorizontalSpeed, -ChargeSlowDown);
         ChargeBar.gameObject.SetActive(true);
 
         arcRenderer.positionCount = 1;
     }
 
-    public override void Skill1Held() {
+    protected override void Skill1Held() {
         if (currentChargeTime < MaxChargeTime) currentChargeTime += Time.fixedDeltaTime;
         currentRange = (currentChargeTime / MaxChargeTime) * MaxRange;
         ChargeImage.rectTransform.localScale = new Vector3(currentChargeTime / MaxChargeTime, 1.0f, 1.0f);
@@ -52,7 +58,7 @@ public class Fatty : PlayerCharacter {
             ChargeImage.color = Color.yellow;
             arcRenderer.enabled = true;
 
-            Vector3 trajectory = (Quaternion.AngleAxis(Attack1Angle, Vector3.forward) * Vector3.right) * currentRange;
+            Vector3 trajectory = (Quaternion.AngleAxis(Skill1Angle, Vector3.forward) * Vector3.right) * currentRange;
             float flip = Mathf.Sign((Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue()) - transform.position).x);
             trajectory.x *= flip;
             CalculateArc(arcResolution, trajectory);
@@ -62,13 +68,13 @@ public class Fatty : PlayerCharacter {
         }
     }
 
-    public override void Skill1Released() {
+    protected override void Skill1Released() {
         ChargeBar.gameObject.SetActive(false);
-        _stats.horizontalSpeedModifier += ChargeSlowDown;
+        _stats.AddToMultiMod(StatType.HorizontalSpeed, ChargeSlowDown);
         ChargeImage.rectTransform.localScale = new Vector3(currentChargeTime / MaxChargeTime, 1.0f, 1.0f);
 
         if (currentChargeTime >= MinChargeTime) {
-            Vector3 trajectory = (Quaternion.AngleAxis(Attack1Angle, Vector3.forward) * Vector3.right) * currentRange;
+            Vector3 trajectory = (Quaternion.AngleAxis(Skill1Angle, Vector3.forward) * Vector3.right) * currentRange;
 
             float flip = Mathf.Sign((Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue()) - transform.position).x);
             trajectory.x *= flip;
@@ -83,25 +89,41 @@ public class Fatty : PlayerCharacter {
     private void Skill1ServerRpc(Vector3 direction) {
         var obj = GameObject.Instantiate(_attackObjects[0].projectile, transform.position, Quaternion.identity).GetComponent<FattyAttack1Projectile>();
         obj.Setup(teamColor.Value);
-        obj.setInitialForce(direction);
-        obj.setDamage(15.0f);
+        obj.SetInitialForce(direction);
+        obj.SetDamage(15.0f);
         obj.GetComponent<NetworkObject>().Spawn();
+    }
+
+    protected override void Skill2Released() {
+        if (!skill2Ready) return;
+        float flip = Mathf.Sign((Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue()) - transform.position).x);
+        Skill2ServerRpc(flip);
+
+        StartCoroutine(performTimedAction(_stats.GetStat(StatType.Skill2Cooldown), () => { skill2Ready = false; }, () => { skill2Ready = true; }));
     }
 
     [ServerRpc]
-    private void Skill2ServerRpc(Vector3 direction) {
+    private void Skill2ServerRpc(float direction) {
         var obj = GameObject.Instantiate(_attackObjects[1].projectile, transform.position, Quaternion.identity).GetComponent<FattyAttack2Projectile>();
         obj.Setup(teamColor.Value);
-        obj.setInitialForce(direction);
-        obj.setDamage(15.0f);
+        obj.SetInitialForce(Skill2Velocity * direction / Time.fixedDeltaTime);
         obj.GetComponent<NetworkObject>().Spawn();
     }
 
+    protected override void Skill3Pressed() {
+        _rigidbody.velocity = Vector3.zero;
+        _rigidbody.AddForce(Vector2.up * Skill3Force);
+        StartCoroutine(performTimedAction(
+            Skill3Duration,
+            () => { DisableInputs(); _inputs.jump = true; },
+            () => { EnableInputs(); _inputs.jump = false; }
+        ));
+    }
 
     private void CalculateArc(int resolution, Vector3 force) {
         arcRenderer.positionCount = resolution + 1;
 
-        float rads = Mathf.Deg2Rad * Attack1Angle;
+        float rads = Mathf.Deg2Rad * Skill1Angle;
         float v = Vector3.Magnitude(force * Time.fixedDeltaTime);
         float g = -Physics2D.gravity.y * Attack1GravityScale;
         float distance = (v * v * Mathf.Sin(2 * rads)) / g + 0.5f;

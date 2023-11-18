@@ -188,7 +188,7 @@ MonoBehaviour:
     m_Bits: 512
   teamColor: 1
   healthBar: {fileID: 8969390475672125114}
-  maxHealth: 500
+  maxHealth: 100
   currentHealth:
     m_InternalValue: 0
 --- !u!114 &1986128999931302673

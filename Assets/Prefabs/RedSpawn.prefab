@@ -247,6 +247,7 @@ GameObject:
   - component: {fileID: 3264265562291936685}
   - component: {fileID: 4925647331905625452}
   - component: {fileID: 1639671733211829041}
+  - component: {fileID: -6204471952591357485}
   m_Layer: 8
   m_Name: RedSpawn
   m_TagString: Untagged
@@ -283,6 +284,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1fe9fa22c5ae35d4a806fc2449c020d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  teamColor: 0
 --- !u!114 &3264265562291936685
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -316,7 +318,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   healthBarImage: {fileID: 3272119350591000276}
-  maxHealth: 400
+  maxHealth: 100
   currentHealth:
     m_InternalValue: 0
 --- !u!60 &1639671733211829041
@@ -348,6 +350,19 @@ PolygonCollider2D:
       - {x: -2.1155343, y: -0.018492341}
       - {x: 0.0055285096, y: -2.1002812}
       - {x: 2.096084, y: 0.010370314}
+--- !u!114 &-6204471952591357485
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6395265376143588670}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1fe9fa22c5ae35d4a806fc2449c020d9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  teamColor: 1
 --- !u!1 &8471057355798382803
 GameObject:
   m_ObjectHideFlags: 0

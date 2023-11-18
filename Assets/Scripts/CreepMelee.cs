@@ -33,10 +33,21 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage {
         }
 
         if (!IsOwner) return;
+        GameplayManager.Singleton.OnGameEndEvent += OnGameEnd;
         currentHealth.Value = maxHealth;
 
         _animator = GetComponent<Animator>();
         _rigidbody = GetComponent<Rigidbody2D>();
+    }
+
+    public override void OnNetworkDespawn() {
+        if (!IsOwner) return;
+
+        GameplayManager.Singleton.OnGameEndEvent -= OnGameEnd;
+    }
+
+    void OnGameEnd(TeamColor loser) {
+        enabled = false;
     }
 
     public void FixedUpdate() {
@@ -91,6 +102,11 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage {
         Debug.Log("Creep trigger enter " + other.name + ' ' + gameObject.layer + ' ' + other.gameObject.layer);
         
         other.GetComponent<ITakesDamage>().TakeDamageServerRpc(new Vector2(100.0f * transform.Find("Parts").localScale.x, 100.0f), meleeDamage);
+        var tryDebuff = other.GetComponent<ITakesDebuff>();
+        if (tryDebuff != null) {
+            tryDebuff.TakeDebuffServerRpc(Debuff.Stun, 1.0f, 0.0f);
+            tryDebuff.TakeDebuffServerRpc(Debuff.JumpSlow, 10.0f, -0.50f);
+        }
     }
 
     IEnumerator AddCooldown(float seconds) {

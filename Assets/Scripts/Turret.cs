@@ -36,7 +36,9 @@ public class Turret : NetworkBehaviour, ITakesDamage {
         Collider2D[] targets = Physics2D.OverlapCircleAll(transform.position, range, enemyMask);
 
         if (targets.Length > 0) {
-            Array.Sort(targets, (x, y) => (int)Mathf.Sign(Mathf.Abs(x.transform.position.x - transform.position.x) - Mathf.Abs(y.transform.position.x - transform.position.x)) );
+            Array.Sort(targets, (x, y) =>
+                (int)Mathf.Sign(Mathf.Abs(x.transform.position.x - transform.position.x) - Mathf.Abs(y.transform.position.x - transform.position.x))
+            );
             var target = targets[0];
             var proj = GameObject.Instantiate(projectile, transform.position, Quaternion.identity).GetComponent<TurretProjectile>();
             proj.GetComponent<NetworkObject>().Spawn();
