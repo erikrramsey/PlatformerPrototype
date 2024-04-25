@@ -14,9 +14,13 @@ public class LobbyMenu : MonoBehaviour {
 
     [SerializeField] private Button leaveButton;
     [SerializeField] private Button startButton;
+    [SerializeField] private Button joinRedButton;
+    [SerializeField] private Button joinBlueButton;
 
+    /*
     [SerializeField] private RectTransform redCharacterLayout;
     [SerializeField] private RectTransform blueCharacterLayout;
+    */
     [SerializeField] private RectTransform redPlayerLayout;
     [SerializeField] private RectTransform bluePlayerLayout;
 
@@ -27,6 +31,7 @@ public class LobbyMenu : MonoBehaviour {
     private List<Button> allButtons = new List<Button>();
 
     void Start() {
+        /*
         foreach (var ch in CharacterList.Singleton.characters) {
             var redPanel = GameObject.Instantiate(characterIconPrefab, redCharacterLayout);
 
@@ -59,6 +64,19 @@ public class LobbyMenu : MonoBehaviour {
             allButtons.Add(rb);
             allButtons.Add(bb);
         }
+        */
+
+        joinRedButton.onClick.AddListener(() => {
+            var info = _playerManager.GetLocalPlayerInfo();
+            info.teamColor = TeamColor.red;
+            _playerManager.SetPlayerInfoServerRPC(info);
+        });
+
+        joinBlueButton.onClick.AddListener(() => {
+            var info = _playerManager.GetLocalPlayerInfo();
+            info.teamColor = TeamColor.blue;
+            _playerManager.SetPlayerInfoServerRPC(info);
+        });
 
         leaveButton.onClick.AddListener(() => {
             _playerManager.Shutdown();
@@ -72,8 +90,13 @@ public class LobbyMenu : MonoBehaviour {
 
         _playerManager = PlayerManager.Singleton;
         _playerManager.OnPlayerInfoChange += OnPlayerInfoChange;
-
         startButton.interactable = false;
+    }
+
+    void OnEnable() {
+        if (_playerManager != null) {
+            OnPlayerInfoChange();
+        }
     }
 
     void OnDestroy() {
@@ -84,8 +107,6 @@ public class LobbyMenu : MonoBehaviour {
     void OnPlayerInfoChange() {
         playerText.text = "Players: " + _playerManager.PlayerList.Count.ToString();
 
-
-        if (NetworkManager.Singleton.IsHost) startButton.interactable = true;
 
         foreach (var but in allButtons) {
             but.interactable = true;
@@ -103,21 +124,21 @@ public class LobbyMenu : MonoBehaviour {
         bool readyToStart = _playerManager.RedPlayers.Count + _playerManager.BluePlayers.Count == PlayerManager.Singleton.PlayerList.Count;
 
         foreach (var player in _playerManager.RedPlayers) {
-            redButtonLookup[player.character].interactable = false;
+            //redButtonLookup[player.character].interactable = false;
             var picon = GameObject.Instantiate(playerIconPrefab, redPlayerLayout).transform;
             picon.Find("PlayerText").GetComponent<TMP_Text>().text = "P" + player.id.ToString();
-            picon.Find("CharacterPanel/CharacterText").GetComponent<TMP_Text>().text = player.character.ToString();
+            //picon.Find("CharacterPanel/CharacterText").GetComponent<TMP_Text>().text = player.character.ToString();
 
-            readyToStart = readyToStart && player.character != Character.none && player.teamColor != TeamColor.none;
+            readyToStart = readyToStart && player.teamColor != TeamColor.none;
         }
 
         foreach (var player in _playerManager.BluePlayers) {
-            blueButtonLookup[player.character].interactable = false;
+            //blueButtonLookup[player.character].interactable = false;
             var picon = GameObject.Instantiate(playerIconPrefab, bluePlayerLayout).transform;
             picon.Find("PlayerText").GetComponent<TMP_Text>().text = "P" + player.id.ToString();
-            picon.Find("CharacterPanel/CharacterText").GetComponent<TMP_Text>().text = player.character.ToString();
+            //picon.Find("CharacterPanel/CharacterText").GetComponent<TMP_Text>().text = player.character.ToString();
 
-            readyToStart = readyToStart && player.character != Character.none && player.teamColor != TeamColor.none;
+            readyToStart = readyToStart && player.teamColor != TeamColor.none;
         }
 
         if (NetworkManager.Singleton.IsHost) {
@@ -125,6 +146,7 @@ public class LobbyMenu : MonoBehaviour {
             startButton.interactable = readyToStart;
         } else {
             startButton.GetComponentInChildren<TMP_Text>().text = "Not host :(";
+            startButton.interactable = false;
         }
     }
 }

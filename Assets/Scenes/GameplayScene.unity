@@ -1219,6 +1219,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   UI: {fileID: 778066901}
   MeleeCreep: {fileID: 7196939998677951597, guid: c52dbbcaccd35784dbb4c6073a894ac1, type: 3}
+  PlayerCharacterPrefab: {fileID: 2373489251252493196, guid: f6a9561d7fad14f409acb3b7d1a471c4, type: 3}
   redSpawn: {fileID: 1171799379}
   blueSpawn: {fileID: 4133969}
   GoldTickRate: 2

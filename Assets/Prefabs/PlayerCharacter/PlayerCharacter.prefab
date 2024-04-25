@@ -123,7 +123,7 @@ GameObject:
   - component: {fileID: 4926631935161717582}
   - component: {fileID: 9153888202054434015}
   m_Layer: 0
-  m_Name: Bass
+  m_Name: PlayerCharacter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -351,6 +351,8 @@ MonoBehaviour:
   - type: 3
     value: 750
   - type: 5
+    value: 1.2
+  - type: 6
     value: 1.2
 --- !u!1 &3666101263559264231
 GameObject:

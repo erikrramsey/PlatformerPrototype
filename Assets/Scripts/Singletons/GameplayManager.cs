@@ -8,6 +8,7 @@ public class GameplayManager : NetworkBehaviour
 {
     [SerializeField] private GameObject UI;
     [SerializeField] private GameObject MeleeCreep;
+    [SerializeField] private GameObject PlayerCharacterPrefab;
 
     [SerializeField] private Transform redSpawn;
     [SerializeField] private Transform blueSpawn;
@@ -19,12 +20,21 @@ public class GameplayManager : NetworkBehaviour
 
     public event Action<TeamColor> OnGameEndEvent;
     private int clientsLoaded;
+    private int clientsSpawned;
 
-    private List<PlayerCharacter> playerCharacters = new List<PlayerCharacter>();
+    private Dictionary<ulong, PlayerCharacter> playerCharacters = new Dictionary<ulong, PlayerCharacter>();
 
     [ServerRpc]
     public void FinishGameServerRpc(TeamColor loser) {
         FinishGameClientRpc(loser);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void OnClientLoadedServerRpc(ServerRpcParams serverRpcParams = default) {
+        clientsSpawned++;
+        if (clientsSpawned == PlayerManager.Singleton.PlayerList.Count) {
+            StartSystems();
+        }
     }
 
     [ClientRpc]
@@ -41,6 +51,7 @@ public class GameplayManager : NetworkBehaviour
         }
 
         clientsLoaded = 0;
+        clientsSpawned = 0;
     }
 
     public override void OnNetworkSpawn() {
@@ -51,16 +62,24 @@ public class GameplayManager : NetworkBehaviour
 
     void OnSceneEvent(SceneEvent sceneEvent) {
         if (sceneEvent.SceneEventType == SceneEventType.LoadComplete) {
-            SpawnPlayerCharacter(sceneEvent.ClientId);
             clientsLoaded++;
-
+            Debug.LogError("Clients loaded " + clientsLoaded);
+            Debug.LogError("Count " + PlayerManager.Singleton.PlayerList.Count);
             if (clientsLoaded == PlayerManager.Singleton.PlayerList.Count) {
-                StartSystems();
+                foreach (var player in PlayerManager.Singleton.PlayerList) {
+                    Debug.LogError(player.id);
+                    SpawnPlayerCharacter(player.id);
+                }
             }
         }
     }
 
     private void StartSystems() {
+        foreach (var player in playerCharacters) {
+            player.Value.currentHealth.Value = 60.0f;
+            player.Value.SetPositionClientRpc(player.Value.transform.position);
+        }
+
         StartCoroutine(SpawnCreeps());
         StartCoroutine(GenerateGold());
     }
@@ -97,7 +116,7 @@ public class GameplayManager : NetworkBehaviour
     IEnumerator GenerateGold() {
         while (true) {
             foreach (var player in playerCharacters) {
-                player.currentGold.Value++;
+                player.Value.currentGold.Value++;
             }
 
             yield return new WaitForSeconds(GoldTickRate);
@@ -105,10 +124,8 @@ public class GameplayManager : NetworkBehaviour
     }
 
     void SpawnPlayerCharacter(ulong clientId) {
-        Debug.Log("Client loaded: " + clientId);
-
         var player = PlayerManager.Singleton.PlayerList[PlayerManager.Singleton.GetPlayerIndex(clientId)];
-        var ch = GameObject.Instantiate(CharacterList.Singleton.Get(player.character)).GetComponent<PlayerCharacter>();
+        var ch = GameObject.Instantiate(PlayerCharacterPrefab).GetComponent<PlayerCharacter>();
         ch.GetComponent<NetworkObject>().SpawnWithOwnership(player.id);
         ch.currentGold.Value = 0;
         
@@ -120,7 +137,7 @@ public class GameplayManager : NetworkBehaviour
             Debug.LogError("invalid team value");
         }
 
-        playerCharacters.Add(ch);
+        playerCharacters.Add(clientId, ch);
 
         var cparams = new ClientRpcParams {
             Send = new ClientRpcSendParams
@@ -135,5 +152,4 @@ public class GameplayManager : NetworkBehaviour
     public Transform GetSpawn(TeamColor color) {
         return color == TeamColor.red? redSpawn : blueSpawn;
     }
-
 }

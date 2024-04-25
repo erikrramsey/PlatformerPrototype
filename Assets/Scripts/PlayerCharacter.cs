@@ -23,7 +23,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     [SerializeField] protected AnimationClip JumpAnim;
 
     public NetworkVariable<TeamColor> teamColor = new NetworkVariable<TeamColor>();
-    public NetworkVariable<float> currentHealth = new NetworkVariable<float>();
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(1.0f);
     public NetworkVariable<int> currentGold = new NetworkVariable<int>();
 
     public HashSet<Item> Items = new HashSet<Item>();
@@ -298,7 +298,6 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     #endregion
 
     #region Network
-
     public override void OnNetworkSpawn() {
         teamColor.OnValueChanged += teamColor_OnValueChanged;
         currentHealth.OnValueChanged += currentHealth_OnValueChanged;
@@ -308,24 +307,19 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         
         if (!IsOwner) return;
         _stats.Initialize();
-
-        GameplayManager.Singleton.OnGameEndEvent += OnGameEnd;
-        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), _stats.GetStat(StatType.MaxHealth));
-
-        currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
-        currentGold_OnValueChanged(currentGold.Value, currentGold.Value);
+        Debug.LogError("Setting health to " + _stats.GetStat(StatType.MaxHealth));
+        SetCurrentHealthServerRpc(_stats.GetStat(StatType.MaxHealth));
     }
 
     #region NetVariableCallbacks
     void currentHealth_OnValueChanged(float previous, float current) {
-        Debug.Log(current);
         healthBarImage.rectTransform.localScale = new Vector3(currentHealth.Value / _stats.GetStat(StatType.MaxHealth), 1.0f, 1.0f);
         healthBarImage.uvRect = new Rect(0.0f, 0.0f, current / 20.0f, 1.0f);
 
         if (!IsOwner) return;
+        Debug.LogError("Health: " + previous + ' ' + current);
         if (current <= 0) {
             Die();
-            return;
         }
 
         GameOverlayUI.Singleton.setHealth(current);
@@ -351,6 +345,10 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
                 hb.gameObject.layer = layer;
             }
         }
+
+        if (!IsOwner) return;
+
+        transform.position = GameplayManager.Singleton.GetSpawn(teamColor.Value).position;
     }
 
     public virtual void currentGold_OnValueChanged(int previous, int current) {
@@ -361,6 +359,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     #region RPC's
     [ServerRpc]
     public void SetCurrentHealthServerRpc(float health) {
+        Debug.Log("setting health " + health);
         currentHealth.Value = health;
     }
 
@@ -423,7 +422,6 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
             debuffTimer.Add(debuff, duration);
         }
 
-
         switch (debuff) {
             case Debuff.Stun:
                 StartCoroutine(performActionAfterCondition(() => {
@@ -469,7 +467,26 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         number.GetComponent<DamageNumber>().SetDamage(damage);
     }
 
-    #endregion
+    [ClientRpc]
+    public void SpawnClientRpc(ClientRpcParams rpcParams = default) {
+        isAlive = true;
+
+        Debug.LogError("Spawning client" + rpcParams.ToString());
+        if (!IsOwner) return;
+
+        GameplayManager.Singleton.OnGameEndEvent += OnGameEnd;
+        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), _stats.GetStat(StatType.MaxHealth));
+        GameplayManager.Singleton.OnClientLoadedServerRpc();
+    }
+
+    [ClientRpc]
+    public void OnClientsSpawnedClientRpc(ClientRpcParams rpcParams = default) {
+        // Send an update so position is loaded by other clients
+        transform.position = transform.position;
+        currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
+        currentGold_OnValueChanged(currentGold.Value, currentGold.Value);
+    }
+
     #endregion
 
     #region PureVirtual
@@ -542,7 +559,6 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         return (dir - (Vector2)transform.position).normalized;
     }
 
-
     // Used for stuns / ability overrides
     protected void DisableInputs() {
         _characterController.Disable();
@@ -556,14 +572,8 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         _characterController.Disable();
     }
 
-    [ClientRpc]
-    public void SpawnClientRpc(ClientRpcParams rpcParams = default) {
-        isAlive = true;
-        transform.position = GameplayManager.Singleton.GetSpawn(teamColor.Value).position;
-        SetCurrentHealthServerRpc(_stats.GetStat(StatType.MaxHealth));
-    }
-
     protected void Die() {
+        Debug.LogError("Dead");
         isAlive = false;
     }
 
@@ -577,9 +587,10 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     }
 
     public void RefreshStatsUIDisplay() {
-        currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
+        //currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
         GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), currentHealth.Value);
     }
 
+    #endregion
     #endregion
 }

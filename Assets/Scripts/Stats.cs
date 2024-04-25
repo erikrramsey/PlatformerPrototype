@@ -91,10 +91,6 @@ public class Stats : NetworkBehaviour {
     public float GetAdd(StatType type) { return addModifiers[type]; }
 
     void OnEffectiveValuesChanged(NetworkListEvent<StatValue> changeEvent) {
-        if (changeEvent.Value.type == StatType.MaxHealth) {
-            Debug.LogError(changeEvent.Value.value);
-        }
-        
         if (OnStatChange != null) OnStatChange();
     }
 
