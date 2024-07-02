@@ -40,7 +40,7 @@ public class Fatty : PlayerCharacter {
     }
 
     protected override void Skill1Pressed() {
-        _stats.AddToMultiMod(StatType.HorizontalSpeed, -ChargeSlowDown);
+        //_stats.AddToMultiMod(StatType.HorizontalSpeed, -ChargeSlowDown);
         ChargeBar.gameObject.SetActive(true);
 
         arcRenderer.positionCount = 1;
@@ -70,7 +70,7 @@ public class Fatty : PlayerCharacter {
 
     protected override void Skill1Released() {
         ChargeBar.gameObject.SetActive(false);
-        _stats.AddToMultiMod(StatType.HorizontalSpeed, ChargeSlowDown);
+        //_stats.AddToMultiMod(StatType.HorizontalSpeed, ChargeSlowDown);
         ChargeImage.rectTransform.localScale = new Vector3(currentChargeTime / MaxChargeTime, 1.0f, 1.0f);
 
         if (currentChargeTime >= MinChargeTime) {

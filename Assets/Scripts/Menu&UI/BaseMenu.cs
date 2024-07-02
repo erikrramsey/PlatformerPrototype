@@ -3,35 +3,29 @@ using UnityEngine;
 using UnityEngine.UI;
 using Steamworks;
 using Unity.Netcode.Transports.UTP;
+using UnityEngine.SceneManagement;
 
 public class BaseMenu : MonoBehaviour {
-    [SerializeField] private Button HostSteamButton;
     [SerializeField] private Button HostUnityButton;
-    [SerializeField] private Button JoinUnityButton;
+    [SerializeField] private Button QuitButton;
 
     private NetworkManager _networkManager;
 
     void Start() {
         _networkManager = NetworkManager.Singleton;
 
-        SteamMatchmaking.OnLobbyEntered += (lobby) => {
-            MainMenuUI.Singleton.PushMenu(MainMenuUI.Singleton.LobbyMenu);
-        };
-
-        HostSteamButton.onClick.AddListener(() => {
-            SteamNetworkManager.Singleton.StartHost(4);
-        });
-
         HostUnityButton.onClick.AddListener(() => {
             _networkManager.NetworkConfig.NetworkTransport = _networkManager.GetComponent<UnityTransport>();
             _networkManager.StartHost();
-            MainMenuUI.Singleton.PushMenu(MainMenuUI.Singleton.LobbyMenu);
+
+            var info = PlayerManager.Singleton.GetLocalPlayerInfo();
+            info.teamColor = TeamColor.red;
+            PlayerManager.Singleton.SetPlayerInfoServerRPC(info);
+            NetworkManager.Singleton.SceneManager.LoadScene("GameplayScene", LoadSceneMode.Single);
         });
 
-        JoinUnityButton.onClick.AddListener(() => {
-            _networkManager.NetworkConfig.NetworkTransport = _networkManager.GetComponent<UnityTransport>();
-            _networkManager.StartClient();
-            MainMenuUI.Singleton.PushMenu(MainMenuUI.Singleton.LobbyMenu);
+        QuitButton.onClick.AddListener(() => {
+            Application.Quit();
         });
     }
 }

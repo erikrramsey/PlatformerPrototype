@@ -14,93 +14,57 @@ public enum StatType {
     Skill1Cooldown,
     Skill2Cooldown,
     Skill3Cooldown,
+    Armor,
+    DamageMultiplier,
 }
 
 public class Stats : NetworkBehaviour {
     [System.Serializable]
-    public struct StatValue : INetworkSerializable, IEquatable<StatValue> {
+    public struct StatValue {
         public StatType type;
         public float value;
-
-        public StatValue(StatType _type, float _value) {
-            type = _type;
-            value = _value;
-        }
-
-        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter {
-            serializer.SerializeValue(ref type);
-            serializer.SerializeValue(ref value);
-        }
-
-        public bool Equals(StatValue other) {
-            return type == other.type;
-        }
     }
 
-    [SerializeField] private StatValue[] baseStatsSerialized;
-
+    [SerializeField] StatValue[] statValuesArray;
     Dictionary<StatType, float> baseStats = new Dictionary<StatType, float>();
-    Dictionary<StatType, float> multiModifiers = new Dictionary<StatType, float>();
-    Dictionary<StatType, float> addModifiers = new Dictionary<StatType, float>();
-
-    Dictionary<StatType, int> NetworkIndex = new Dictionary<StatType, int>();
-    public NetworkList<StatValue> EffectiveValues;
-
+    Dictionary<StatType, float> effectiveStats = new Dictionary<StatType, float>();
     public Action OnStatChange;
 
     public void Awake() {
-        EffectiveValues = new NetworkList<StatValue>();
-        EffectiveValues.OnListChanged += OnEffectiveValuesChanged;
+        foreach (var stat in statValuesArray) {
+            baseStats.Add(stat.type, stat.value);
+            effectiveStats.Add(stat.type, stat.value);
+        }
     }
 
-    public void Initialize() {
-        Debug.Log("init stats");
-        int index = 0;
-        foreach (var stat in baseStatsSerialized) {
-            baseStats.Add(stat.type, stat.value);
-            multiModifiers.Add(stat.type, 1.0f);
-            addModifiers.Add(stat.type, 0.0f);
-
-            AddValueServerRpc(new StatValue(stat.type, stat.value));
-            //NetworkIndex.Add(stat.type, index);
-            index++;
+    public void AddItem(HashSet<Item> items) {
+        Dictionary<StatType, float> cummValue = new Dictionary<StatType, float>(baseStats);
+        foreach (var item in items) {
+            foreach (var af in item.affectedStats) {
+                float prevVal = 0;
+                cummValue.TryGetValue(af.Type, out prevVal);
+                cummValue[af.Type] = prevVal + af.Value;
+            }
         }
+
+        foreach(var stat in cummValue) {
+            SetStatServerRpc(stat.Key, stat.Value);
+        }
+    }
+
+    [ServerRpc(RequireOwnership=false)]
+    public void SetStatServerRpc(StatType type, float value) {
+        SetStatClientRpc(type, value);
+    }
+
+    [ClientRpc]
+    public void SetStatClientRpc(StatType type, float value) {
+        Debug.Log("Stat changed: " + type + " " + value);
+        effectiveStats[type] = value;
+        OnStatChange();
     }
 
     public float GetStat(StatType type) {
-        if (IsOwner) {
-            return (baseStats[type] + addModifiers[type]) * multiModifiers[type];
-        } else {
-            return EffectiveValues[EffectiveValues.IndexOf(new StatValue(type, 0))].value;
-        }
-    }
-
-    public void AddToAddMod(StatType type, float value) {
-        addModifiers[type] += value;
-
-        var ind = EffectiveValues.IndexOf(new StatValue(type, 0));
-        SetValueServerRpc(new StatValue(type, GetStat(type)), ind);
-    }
-
-    public void AddToMultiMod(StatType type, float value) {
-        multiModifiers[type] += value;
-    }
-
-    public float GetBaseStat(StatType type) { return baseStats[type]; }
-    public float GetMulti(StatType type) { return multiModifiers[type]; }
-    public float GetAdd(StatType type) { return addModifiers[type]; }
-
-    void OnEffectiveValuesChanged(NetworkListEvent<StatValue> changeEvent) {
-        if (OnStatChange != null) OnStatChange();
-    }
-
-    [ServerRpc]
-    void AddValueServerRpc(StatValue val) {
-        EffectiveValues.Add(val);
-    }
-
-    [ServerRpc]
-    void SetValueServerRpc(StatValue val, int index) {
-        EffectiveValues[index] = val;
+        return effectiveStats[type];
     }
 }

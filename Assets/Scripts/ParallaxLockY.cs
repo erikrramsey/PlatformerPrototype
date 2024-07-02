@@ -2,12 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[ExecuteInEditMode]
 public class ParallaxLockY : MonoBehaviour
 {
     [SerializeField] public float parallaxValue = 0.0f;
     private Camera _camera;
 
-    void Start() {
+    void Awake() {
         _camera = Camera.main;
     }
 

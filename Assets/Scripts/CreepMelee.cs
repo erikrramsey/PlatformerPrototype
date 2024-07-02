@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,8 +9,10 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     [SerializeField] private float maxHealth;
     [SerializeField] private float horizontalSpeed;
     [SerializeField] private float horizontalAccel;
+    [SerializeField] private float jumpForce;
     [SerializeField] private float attackCooldown;
     [SerializeField] private float meleeDamage;
+    [SerializeField] private int goldValue;
 
     [SerializeField] private RawImage healthBarImage;
 
@@ -20,8 +23,10 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     private Animator _animator;
     private Vector2 forward;
     private LayerMask enemyLayer;
+    private Transform LastDamageSource;
 
     private bool cooldown = false;
+    private bool disabled = false;
 
     public override void OnNetworkSpawn() {
         teamColor.OnValueChanged += teamColor_OnValueChanged;
@@ -53,22 +58,27 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     public void FixedUpdate() {
         if (!IsOwner) return;
         if (cooldown) return;
-
+        if (disabled) return;
 
         Vector2 forceToAdd = Vector2.zero;
 
         var grounded = false;
-        var rc = Physics2D.CircleCast(transform.position, 0.5f, Vector2.down, 0.3f, LayerMask.GetMask("Environment"));
+        var rc = Physics2D.CircleCast(transform.position, 0.5f, Vector2.down, 0.3f, LayerMask.GetMask(new []{"Environment", "PTEnvironment"}));
         if (rc) grounded = true;
+        if (!grounded) return;
 
         // Check if something in front
         var creatureCasts = Physics2D.CircleCastAll(transform.position + (Vector3)forward, 0.35f, forward, 0.2f, enemyLayer);
+        var wallCast = Physics2D.CircleCast(transform.position + (Vector3)forward, 0.35f, forward, 0.8f, LayerMask.GetMask(new []{"Environment"}));
+
         if (grounded) {
             forceToAdd = forward * horizontalAccel;
         }
 
+        if (wallCast) {
+            forceToAdd = Vector2.up * jumpForce;
+        }
 
-        if (!grounded) return;
 
         foreach (var creatureCast in creatureCasts) {
             string layer = LayerMask.LayerToName(creatureCast.transform.gameObject.layer);
@@ -101,7 +111,11 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
         Debug.Log("Creep trigger enter " + other.name + ' ' + gameObject.layer + ' ' + other.gameObject.layer);
         
-        other.GetComponent<ITakesDamage>().TakeDamageServerRpc(meleeDamage);
+        if (!IsSpawned) {
+            other.GetComponent<ITakesDamage>().TakeDamageServerRpc(meleeDamage);
+        } else {
+            other.GetComponent<ITakesDamage>().TakeDamageServerRpc(GetComponent<NetworkObject>(), meleeDamage);
+        }
     }
 
     IEnumerator AddCooldown(float seconds) {
@@ -111,11 +125,36 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     }
 
     [ServerRpc(RequireOwnership = false)]
+    public void TakeDamageServerRpc(NetworkObjectReference dealer, float damage) {
+        if (dealer.TryGet(out NetworkObject dealerObj)) {
+            LastDamageSource = dealerObj.transform;
+        }
+
+        TakeDamageServerRpc(damage);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc(float damage) {
         Debug.Log("Creep taking damage" + OwnerClientId);
-
         currentHealth.Value -= damage;
         if (currentHealth.Value > maxHealth) currentHealth.Value = maxHealth;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void TakeDebuffServerRpc(Debuff debuff, float duration, float value, bool isMult = false) {
+        switch (debuff) {
+            case Debuff.Stun:
+                StartCoroutine(performTimedAction(duration,
+                () => {
+                    disabled = true;
+                }, () => {
+                    disabled = false;
+                }));
+                break;
+            default:
+                Debug.LogError("Unhandled debuff " + debuff.ToString());
+                break;
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -162,10 +201,23 @@ public class CreepMelee : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     }
 
     void currentHealth_OnValueChanged(float previous, float current) {
-        if (current <= 0.0f) GetComponent<NetworkObject>().Despawn();
+        if (current <= 0.0f) {
+            OnDeath();
+        }
 
         healthBarImage.rectTransform.localScale = new Vector3(currentHealth.Value / maxHealth, 1.0f, 1.0f);
         healthBarImage.uvRect = new Rect(0.0f, 0.0f, current / 20.0f, 1.0f);
+    }
+
+    void OnDeath() {
+        LastDamageSource.GetComponent<IHasGold>()?.AddGoldServerRpc(goldValue);
+        GetComponent<NetworkObject>().Despawn();
+    }
+
+    protected IEnumerator performTimedAction(float time, Action first, Action second) {
+        first();
+        yield return new WaitForSeconds(time);
+        second();
     }
 
 }

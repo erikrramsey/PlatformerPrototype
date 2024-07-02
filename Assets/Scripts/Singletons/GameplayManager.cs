@@ -14,7 +14,9 @@ public class GameplayManager : NetworkBehaviour
     [SerializeField] private Transform blueSpawn;
 
     [SerializeField] private float GoldTickRate;
-    [field: SerializeField] public float RespawnTime { get; private set;}
+
+    [SerializeField] private GameObject StageHazardPrefab;
+    [SerializeField] private Transform StageHazardLocationParent;
 
     public static GameplayManager Singleton { get; private set; } = null;
 
@@ -63,11 +65,10 @@ public class GameplayManager : NetworkBehaviour
     void OnSceneEvent(SceneEvent sceneEvent) {
         if (sceneEvent.SceneEventType == SceneEventType.LoadComplete) {
             clientsLoaded++;
-            Debug.LogError("Clients loaded " + clientsLoaded);
-            Debug.LogError("Count " + PlayerManager.Singleton.PlayerList.Count);
+            Debug.Log("Clients loaded " + clientsLoaded);
+            Debug.Log("Count " + PlayerManager.Singleton.PlayerList.Count);
             if (clientsLoaded == PlayerManager.Singleton.PlayerList.Count) {
                 foreach (var player in PlayerManager.Singleton.PlayerList) {
-                    Debug.LogError(player.id);
                     SpawnPlayerCharacter(player.id);
                 }
             }
@@ -75,15 +76,10 @@ public class GameplayManager : NetworkBehaviour
     }
 
     private void StartSystems() {
-        foreach (var player in playerCharacters) {
-            player.Value.currentHealth.Value = 60.0f;
-            player.Value.SetPositionClientRpc(player.Value.transform.position);
-        }
-
         StartCoroutine(SpawnCreeps());
         StartCoroutine(GenerateGold());
+        StartCoroutine(SpawnStageHazards());
     }
-
 
     IEnumerator SpawnCreeps() {
         while (true) {
@@ -117,9 +113,23 @@ public class GameplayManager : NetworkBehaviour
         while (true) {
             foreach (var player in playerCharacters) {
                 player.Value.currentGold.Value++;
+                player.Value.OnClientsSpawnedServerRpc();
             }
 
             yield return new WaitForSeconds(GoldTickRate);
+        }
+    }
+
+    IEnumerator SpawnStageHazards() {
+        while (true) {
+            foreach (Transform tr in StageHazardLocationParent.transform) {
+                if (tr.childCount == 0) {
+                    var sh = GameObject.Instantiate(StageHazardPrefab);
+                    sh.GetComponent<NetworkObject>().Spawn();
+                    sh.GetComponent<NetworkObject>().TrySetParent(tr, false);
+                }
+            }
+            yield return new WaitForSeconds(60.0f);
         }
     }
 
@@ -127,7 +137,6 @@ public class GameplayManager : NetworkBehaviour
         var player = PlayerManager.Singleton.PlayerList[PlayerManager.Singleton.GetPlayerIndex(clientId)];
         var ch = GameObject.Instantiate(PlayerCharacterPrefab).GetComponent<PlayerCharacter>();
         ch.GetComponent<NetworkObject>().SpawnWithOwnership(player.id);
-        ch.currentGold.Value = 0;
         
         if (player.teamColor == TeamColor.red) {
             ch.teamColor.Value = TeamColor.red;
@@ -138,15 +147,6 @@ public class GameplayManager : NetworkBehaviour
         }
 
         playerCharacters.Add(clientId, ch);
-
-        var cparams = new ClientRpcParams {
-            Send = new ClientRpcSendParams
-            {
-                TargetClientIds = new ulong[]{clientId}
-            }
-        };
-
-        ch.SpawnClientRpc(cparams);
     }
 
     public Transform GetSpawn(TeamColor color) {

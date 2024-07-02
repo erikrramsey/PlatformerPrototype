@@ -107,7 +107,6 @@ public class LobbyMenu : MonoBehaviour {
     void OnPlayerInfoChange() {
         playerText.text = "Players: " + _playerManager.PlayerList.Count.ToString();
 
-
         foreach (var but in allButtons) {
             but.interactable = true;
         }

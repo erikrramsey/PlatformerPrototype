@@ -9,7 +9,7 @@ public class DamageNumber : MonoBehaviour
     [SerializeField] public float ttl;
     
     public void SetDamage(float damage) {
-        GetComponent<TMP_Text>().text = damage.ToString();
+        GetComponent<TMP_Text>().text = Mathf.Round(damage).ToString();
         Destroy(this.gameObject, ttl);
     }
 

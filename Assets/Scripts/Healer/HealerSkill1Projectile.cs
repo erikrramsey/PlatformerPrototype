@@ -8,7 +8,7 @@ public class HealerSkill1Projectile : Projectile {
 
         var dam = other.GetComponent<ITakesDamage>();
         GetComponent<NetworkObject>().Despawn();
-        dam.TakeDamageServerRpc(baseDamage);
+        //dam.TakeDamageServerRpc(baseDamage);
     }
 
 }

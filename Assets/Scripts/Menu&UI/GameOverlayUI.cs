@@ -19,6 +19,8 @@ public class GameOverlayUI : MonoBehaviour {
             Destroy(gameObject);
             return;
         }
+
+        GetComponent<Canvas>().worldCamera = Camera.main;
     }
 
     public void setMaxHealth(float max, float current) {

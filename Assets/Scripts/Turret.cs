@@ -5,32 +5,29 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.UI;
 
-public class Turret : NetworkBehaviour, ITakesDamage {
+public class Turret : NetworkBehaviour {
     [SerializeField] private GameObject projectile;
     [SerializeField] private float range;
     [SerializeField] private float cooldown;
     [SerializeField] private LayerMask enemyMask;
     [SerializeField] private TeamColor teamColor;
-
-    [SerializeField] private RawImage healthBar;
-    [SerializeField] private float maxHealth;
-    public NetworkVariable<float> currentHealth;
+    [SerializeField] private int goldValue;
+    [SerializeField] private Transform[] destroyedTransforms;
 
     private bool OnCooldown;
+    private Health _health;
 
-    public override void OnNetworkSpawn() {
-        currentHealth.OnValueChanged = CurrentHealth_OnValueChanged;
-        if (currentHealth.Value > 0) {
-            CurrentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
-        }
-
-        if (!IsServer) return;
-        OnCooldown = false;
-        currentHealth.Value = maxHealth;
+    protected void Awake() {
+        _health = GetComponent<Health>();
+        _health.OnDeath += OnDeath;
     }
 
-    void FixedUpdate()
-    {
+    public override void OnNetworkSpawn() {
+        if (!IsServer) return;
+        OnCooldown = false;
+    }
+
+    void FixedUpdate() {
         if (!IsServer) return;
         if (OnCooldown) return;
         Collider2D[] targets = Physics2D.OverlapCircleAll(transform.position, range, enemyMask);
@@ -47,20 +44,12 @@ public class Turret : NetworkBehaviour, ITakesDamage {
         }
     }
 
-    void CurrentHealth_OnValueChanged(float previous, float current) {
-        if (current <= 0.0f) {
-            GetComponent<NetworkObject>().Despawn();
-            return;
+    protected void OnDeath() {
+        _health.LastDamageSource.GetComponent<IHasGold>()?.AddGoldServerRpc(goldValue);
+        GetComponent<NetworkObject>().Despawn();
+        foreach (var tr in destroyedTransforms) {
+            tr.GetComponent<NetworkObject>().Despawn();
         }
-        healthBar.rectTransform.localScale = new Vector3(currentHealth.Value / maxHealth, 1.0f, 1.0f);
-        healthBar.uvRect = new Rect(0.0f, 0.0f, current / 20.0f, 1.0f);
-    }
-    
-    [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(float damage) {
-        Debug.Log("Turret taking damage" + OwnerClientId);
-        currentHealth.Value -= damage;
-        if (currentHealth.Value > maxHealth) currentHealth.Value = maxHealth;
     }
 
     IEnumerator ShotCooldown() {

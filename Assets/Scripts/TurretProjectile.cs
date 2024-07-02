@@ -20,6 +20,7 @@ public class TurretProjectile : Projectile {
 
     protected override void OnEnemyCollision(Collider2D other) {
         Debug.Log("Turret trigger enter " + other.name + ' ' + gameObject.layer + ' ' + other.gameObject.layer);
+        if (other.transform != target) return;
 
         if (IsSpawned) GetComponent<NetworkObject>().Despawn();
 
@@ -30,6 +31,10 @@ public class TurretProjectile : Projectile {
 
 
         deb?.TakeDebuffServerRpc(Debuff.Knockback, 0, knockback / Time.fixedDeltaTime * dir);
-        dam?.TakeDamageServerRpc(baseDamage);
+        if (source.GetComponent<NetworkObject>().IsSpawned) {
+            dam?.TakeDamageServerRpc(source.GetComponent<NetworkObject>(), baseDamage);
+        } else {
+            dam?.TakeDamageServerRpc(baseDamage);
+        }
     }
 }

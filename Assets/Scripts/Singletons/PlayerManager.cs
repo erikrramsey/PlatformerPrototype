@@ -34,6 +34,7 @@ public class PlayerManager : NetworkBehaviour {
     }
 
     void Awake() {
+        Debug.Log("PlayerManager Awake");
         PlayerList = new NetworkList<PlayerInfo>();
         PlayerList.OnListChanged += OnPlayerListChanged;
         RedPlayers = new List<PlayerInfo>();
@@ -50,25 +51,29 @@ public class PlayerManager : NetworkBehaviour {
 
     public override void OnNetworkSpawn() {
         if (!IsOwner) return;
-
-        PlayerList.Clear();
-        RedPlayers.Clear();
-        BluePlayers.Clear();
-
         _networkManager = NetworkManager.Singleton;
         _networkManager.OnClientConnectedCallback += PlayerConnected;
         _networkManager.OnClientDisconnectCallback += PlayerDisconnected;
-    }
 
-    public void Shutdown() {
-        if (!IsOwner && NetworkManager.Singleton != null) return;
+        if (!IsHost) return;
+        Debug.Log("Spawning PlayerManager");
 
         PlayerList.Clear();
         RedPlayers.Clear();
         BluePlayers.Clear();
+    }
 
+    public void Shutdown() {
+        if (!IsOwner) return;
         _networkManager.OnClientConnectedCallback -= PlayerConnected;
         _networkManager.OnClientDisconnectCallback -= PlayerDisconnected;
+
+        if (!IsHost) return;
+        Debug.Log("Shutting Down PlayerManager");
+
+        PlayerList.Clear();
+        RedPlayers.Clear();
+        BluePlayers.Clear();
     }
 
     void PlayerConnected(ulong id) {

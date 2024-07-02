@@ -79,7 +79,7 @@ public class BassProjectile1 : Projectile {
         _attachedPlayer = other.transform; 
         _wasAttached = true;
         _rigidbody.velocity = Vector2.zero;
-        source.GetComponent<Bass>().SetProjectile1TargetClientRpc(_attachedPlayer.GetComponent<NetworkObject>(), ownerParams);
+        //source.GetComponent<Bass>().SetProjectile1TargetClientRpc(_attachedPlayer.GetComponent<NetworkObject>(), ownerParams);
         OnHit(ownerParams);
     }
 

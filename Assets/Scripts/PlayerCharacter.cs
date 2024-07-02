@@ -7,10 +7,16 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
-public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
+public class PlayerCharacter : NetworkBehaviour,
+    ITakesDamage,
+    ITakesDebuff,
+    IHasGold {
     #region Serialized
 
     [SerializeField] protected Stats _stats;
+    [SerializeField] protected float timeToSpawn;
+    [SerializeField] protected int StartingGold;
+    [SerializeField] protected int PlayerGoldValue;
 
     [SerializeField] protected AttackObject[] _attackObjects;
 
@@ -21,29 +27,36 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     [SerializeField] protected AnimationClip IdleAnim;
     [SerializeField] protected AnimationClip WalkAnim;
     [SerializeField] protected AnimationClip JumpAnim;
+    [SerializeField] protected AnimationClip StunAnim;
+    [SerializeField] protected float LowHealthKnockbackMulti;
+    [SerializeField] protected float LowHealthStunMulti;
+    [SerializeField] protected SpriteRenderer[] teamColorSprites;
 
     public NetworkVariable<TeamColor> teamColor = new NetworkVariable<TeamColor>();
     public NetworkVariable<float> currentHealth = new NetworkVariable<float>(1.0f);
     public NetworkVariable<int> currentGold = new NetworkVariable<int>();
 
-    public HashSet<Item> Items = new HashSet<Item>();
+    public HashSet<Item> items = new HashSet<Item>();
     #endregion
-
 
     private Camera _camera;
     protected Rigidbody2D _rigidbody;
+    protected Collider2D _hurtbox;
     protected Animator _animator;
     private ClientNetworkAnimator _networkAnimator;
     protected bool waitingForAnimationComplete;
     private Dictionary<Debuff, float> debuffTimer = new Dictionary<Debuff, float>();
     protected ClientRpcParams ownerParams;
 
+    private Transform LastDamageSource;
 
     protected bool skill1Ready;
     protected bool skill2Ready;
     protected bool skill3Ready;
 
     protected bool isAlive;
+    protected bool isDisabled;
+    protected bool grounded;
 
     protected class Inputs {
         public Vector2 movement = new Vector2(0.0f, 0.0f);
@@ -59,13 +72,15 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
     #region UnityCallbacks
     protected virtual void Awake() {
-
         _rigidbody = GetComponent<Rigidbody2D>();
         _animator = GetComponent<Animator>();
         _networkAnimator = GetComponent<ClientNetworkAnimator>();
         _camera = Camera.main;
         _inputs = new Inputs();
+        _hurtbox = GetComponent<CapsuleCollider2D>();
 
+        currentHealth.Value = 1.0f;
+        currentGold.Value = StartingGold;
     }
 
     protected virtual void Start()
@@ -225,7 +240,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         completedDebuffs.Clear();
 
 
-        var grounded = false;
+        grounded = false;
 
         var rc = Physics2D.CircleCast(transform.position + Vector3.down, 0.4f, Vector2.down, 0.3f, LayerMask.GetMask(new[] {"Environment", "PTEnvironment"}));
         if (rc && _rigidbody.velocity.y < 0.1f) grounded = true;
@@ -234,6 +249,8 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         if (_inputs.skill2) Skill2Held();
         if (_inputs.skill3) Skill3Held();
 
+
+        if (isDisabled) return;
 
         if (_inputs.movement.x > 0.1f) {
             _animator.Play(WalkAnim.name);
@@ -277,38 +294,41 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         if (!grounded && !_inputs.jump && _rigidbody.velocity.y > 0.0f) {
             _rigidbody.velocity = new Vector3(_rigidbody.velocity.x, _rigidbody.velocity.y / _stats.GetStat(StatType.JumpDampForce), 0.0f);
         }
-
     }
 
-
-    void OnTriggerEnter2D(Collider2D other) {
+    protected virtual void OnTriggerEnter2D(Collider2D other) {
         if (!IsOwner) return;
         if (!(other.gameObject.layer == LayerMask.NameToLayer("RedHurtbox") || 
-            other.gameObject.layer == LayerMask.NameToLayer("BlueHurtbox"))) return;
+              other.gameObject.layer == LayerMask.NameToLayer("BlueHurtbox") ||
+              other.gameObject.layer == LayerMask.NameToLayer("StageHazardHurtbox"))) return;
 
         Debug.Log("Player trigger enter " + other.name + ' ' + gameObject.layer + ' ' + other.gameObject.layer);
-        
 
         OnEnemySkillHit(other);
     }
 
     protected virtual void OnEnemySkillHit(Collider2D other) {}
 
-
     #endregion
 
     #region Network
     public override void OnNetworkSpawn() {
+        Debug.Log("Spawning player " + OwnerClientId);
+        isAlive = true;
+        isDisabled = false;
+
         teamColor.OnValueChanged += teamColor_OnValueChanged;
         currentHealth.OnValueChanged += currentHealth_OnValueChanged;
         currentGold.OnValueChanged += currentGold_OnValueChanged;
 
-        _stats.OnStatChange += RefreshStatsUIDisplay;
+        _stats.OnStatChange += RefreshStatsUIServerRpc;
         
         if (!IsOwner) return;
-        _stats.Initialize();
-        Debug.LogError("Setting health to " + _stats.GetStat(StatType.MaxHealth));
         SetCurrentHealthServerRpc(_stats.GetStat(StatType.MaxHealth));
+
+        GameplayManager.Singleton.OnGameEndEvent += OnGameEnd;
+        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), _stats.GetStat(StatType.MaxHealth));
+        GameplayManager.Singleton.OnClientLoadedServerRpc();
     }
 
     #region NetVariableCallbacks
@@ -317,9 +337,8 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         healthBarImage.uvRect = new Rect(0.0f, 0.0f, current / 20.0f, 1.0f);
 
         if (!IsOwner) return;
-        Debug.LogError("Health: " + previous + ' ' + current);
-        if (current <= 0) {
-            Die();
+        if (current <= 0 && isAlive) {
+            OnDeath();
         }
 
         GameOverlayUI.Singleton.setHealth(current);
@@ -338,7 +357,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
             col = Color.blue;
         }
 
-        foreach (SpriteRenderer sp in transform.GetComponentsInChildren<SpriteRenderer>(true)) {
+        foreach (SpriteRenderer sp in teamColorSprites) {
             sp.color = col;
             var hb = sp.GetComponent<Collider2D>();
             if (hb) {
@@ -352,6 +371,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     }
 
     public virtual void currentGold_OnValueChanged(int previous, int current) {
+        if (!IsOwner) return;
         GameOverlayUI.Singleton.setGold(current);
     }
     #endregion
@@ -363,6 +383,11 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         currentHealth.Value = health;
     }
 
+    [ServerRpc(RequireOwnership = false)]
+    public void AddGoldServerRpc(int gold) {
+        currentGold.Value += gold;
+    }
+
     [ClientRpc]
     public void SetPositionClientRpc(Vector3 position) {
         Debug.Log("Setting player position to: " + position + " on " + OwnerClientId);
@@ -370,8 +395,13 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     }
 
     [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(float damage) {
-        Debug.Log("taking damage" + OwnerClientId);
+    public void TakeDamageServerRpc(NetworkObjectReference dealer, float damage) {
+        Debug.Log("Player taking damage" + OwnerClientId);
+
+        if (dealer.TryGet(out NetworkObject dealerObj)) {
+            LastDamageSource = dealerObj.transform;
+        }
+
         ClientRpcParams clientRpcParams = new ClientRpcParams {
             Send = new ClientRpcSendParams
             {
@@ -383,6 +413,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         if (currentHealth.Value > _stats.GetStat(StatType.MaxHealth)) {
             currentHealth.Value = _stats.GetStat(StatType.MaxHealth);
         }
+
         TakeDamageClientRpc(damage, clientRpcParams);
     }
 
@@ -417,9 +448,9 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     public void TakeDebuffClientRpc(Debuff debuff, float duration, float value, bool isMult = false, ClientRpcParams p = default) {
 
         if (debuffTimer.ContainsKey(debuff)) {
-            debuffTimer[debuff] += duration;
+            debuffTimer[debuff] += duration * GetStunMultiplier();
         } else {
-            debuffTimer.Add(debuff, duration);
+            debuffTimer.Add(debuff, duration * GetStunMultiplier());
         }
 
         switch (debuff) {
@@ -427,11 +458,10 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
                 StartCoroutine(performActionAfterCondition(() => {
                     return debuffTimer.ContainsKey(debuff) && debuffTimer[debuff] > 0.0f;
                 }, () => {
-                    _stats.AddToAddMod(StatType.HorizontalSpeed, 100);
-                    _characterController.Disable();
+                    DisableInputs();
+                    _animator.Play(StunAnim.name);
                 }, () => {
-                    _stats.AddToAddMod(StatType.HorizontalSpeed, -100);
-                    _characterController.Enable();
+                    EnableInputs();
                 }));
                 break;
 
@@ -439,9 +469,9 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
                 StartCoroutine(performActionAfterCondition(() => {
                     return debuffTimer.ContainsKey(debuff) && debuffTimer[debuff] > 0.0f;
                 }, () => {
-                    _stats.AddToMultiMod(StatType.JumpForce, value);
+                    //_stats.AddToMultiMod(StatType.JumpForce, value);
                 }, () => {
-                    _stats.AddToMultiMod(StatType.JumpForce, -value);
+                    //_stats.AddToMultiMod(StatType.JumpForce, -value);
                 }));
                 break;
         }
@@ -453,7 +483,7 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     public void TakeDebuffClientRpc(Debuff debuff, float duration, Vector3 value, bool isMult = false, ClientRpcParams p = default) {
         switch (debuff) {
             case Debuff.Knockback:
-                _rigidbody.AddForce(value);
+                _rigidbody.AddForce(value * GetKnockbackMultiplier());
                 break;
             default:
                 Debug.LogError("Unhandled debuff " + debuff.ToString());
@@ -467,24 +497,25 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
         number.GetComponent<DamageNumber>().SetDamage(damage);
     }
 
-    [ClientRpc]
-    public void SpawnClientRpc(ClientRpcParams rpcParams = default) {
-        isAlive = true;
+    [ServerRpc(RequireOwnership = false)]
+    public void OnClientsSpawnedServerRpc(ServerRpcParams rpcParams = default) {
+        currentHealth.SetDirty(true);
+        currentGold.SetDirty(true);
+    }
 
-        Debug.LogError("Spawning client" + rpcParams.ToString());
-        if (!IsOwner) return;
-
-        GameplayManager.Singleton.OnGameEndEvent += OnGameEnd;
-        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), _stats.GetStat(StatType.MaxHealth));
-        GameplayManager.Singleton.OnClientLoadedServerRpc();
+    [ServerRpc(RequireOwnership=false)]
+    public void RefreshStatsUIServerRpc() {
+        RefreshStatsUIClientRpc();
     }
 
     [ClientRpc]
-    public void OnClientsSpawnedClientRpc(ClientRpcParams rpcParams = default) {
-        // Send an update so position is loaded by other clients
-        transform.position = transform.position;
+    public void RefreshStatsUIClientRpc() {
         currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
         currentGold_OnValueChanged(currentGold.Value, currentGold.Value);
+        
+        if (!IsOwner) return;
+        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), currentHealth.Value);
+        ShopOverlay.Singleton.SetItems(items);
     }
 
     #endregion
@@ -505,9 +536,11 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
 
     #region Utility
     protected IEnumerator PassThroughPlatform(PlatformEffector2D pp) {
-        pp.rotationalOffset = 180;
+        //pp.rotationalOffset = 180;
+        Physics2D.IgnoreCollision(_hurtbox, pp.GetComponent<Collider2D>(), true);
         yield return new WaitForSeconds(0.5f);
-        pp.rotationalOffset = 0;
+        Physics2D.IgnoreCollision(_hurtbox, pp.GetComponent<Collider2D>(), false);
+        //pp.rotationalOffset = 0;
     }
 
     protected IEnumerator WaitForAnimationComplete(float seconds) {
@@ -562,33 +595,45 @@ public class PlayerCharacter : NetworkBehaviour, ITakesDamage, ITakesDebuff {
     // Used for stuns / ability overrides
     protected void DisableInputs() {
         _characterController.Disable();
+        isDisabled = true;
     }
 
     protected void EnableInputs() {
         _characterController.Enable();
+        isDisabled = false;
     }
 
     protected void OnGameEnd(TeamColor loser) {
         _characterController.Disable();
     }
 
-    protected void Die() {
-        Debug.LogError("Dead");
+    protected IEnumerator Spawn() {
+        //GameOverlayUI.Singleton.PlaySpawnAnimation();
+        transform.position = new Vector3(0.0f, 2000.0f, 0.0f);
+        yield return new WaitForSeconds(timeToSpawn);
+        SetCurrentHealthServerRpc(_stats.GetStat(StatType.MaxHealth));
+        transform.position = GameplayManager.Singleton.GetSpawn(teamColor.Value).position;
+        isAlive = true;
+    }
+
+    protected void OnDeath() {
+        Debug.Log("Dead: " + OwnerClientId);
+        LastDamageSource?.GetComponent<IHasGold>()?.AddGoldServerRpc(PlayerGoldValue);
         isAlive = false;
+        StartCoroutine(Spawn());
     }
 
     public void AddItem(Item item) {
-        Items.Add(item);
-        foreach (var st in item.affectedStats) {
-            _stats.AddToAddMod(st.Type, st.Value);
-        }
-
-        RefreshStatsUIDisplay();
+        items.Add(item);
+        _stats.AddItem(items);
     }
 
-    public void RefreshStatsUIDisplay() {
-        //currentHealth_OnValueChanged(currentHealth.Value, currentHealth.Value);
-        GameOverlayUI.Singleton.setMaxHealth(_stats.GetStat(StatType.MaxHealth), currentHealth.Value);
+    protected float GetKnockbackMultiplier() {
+        return 1 + (LowHealthKnockbackMulti * (1 - (currentHealth.Value / _stats.GetStat(StatType.MaxHealth))));
+    }
+
+    protected float GetStunMultiplier() {
+        return 1 + (LowHealthStunMulti * (1 - (currentHealth.Value / _stats.GetStat(StatType.MaxHealth))));
     }
 
     #endregion

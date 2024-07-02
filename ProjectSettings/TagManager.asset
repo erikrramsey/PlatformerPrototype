@@ -20,8 +20,8 @@ TagManager:
   - RedOnlyEnvironment
   - BlueOnlyEnvironment
   - Minimap
-  - 
-  - 
+  - StageHazardHitbox
+  - StageHazardHurtbox
   - 
   - 
   - 
@@ -49,6 +49,9 @@ TagManager:
     locked: 0
   - name: BG3
     uniqueID: 1393332817
+    locked: 0
+  - name: Environment
+    uniqueID: 1337810763
     locked: 0
   - name: Player Level
     uniqueID: 3101405751

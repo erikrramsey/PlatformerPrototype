@@ -5,6 +5,7 @@ using UnityEngine;
 public class Item : MonoBehaviour {
     [SerializeField] public string ItemName;
     [SerializeField] public string Description;
+    [SerializeField] public int GoldValue;
 
     [System.Serializable]
     public struct AffectedStat {
