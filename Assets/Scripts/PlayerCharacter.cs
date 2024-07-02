@@ -47,6 +47,7 @@ public class PlayerCharacter : NetworkBehaviour,
     protected bool waitingForAnimationComplete;
     private Dictionary<Debuff, float> debuffTimer = new Dictionary<Debuff, float>();
     protected ClientRpcParams ownerParams;
+    protected Transform _playerWorldUI;
 
     private Transform LastDamageSource;
 
@@ -78,6 +79,9 @@ public class PlayerCharacter : NetworkBehaviour,
         _camera = Camera.main;
         _inputs = new Inputs();
         _hurtbox = GetComponent<CapsuleCollider2D>();
+        _playerWorldUI = GameObject.Find("PlayerWorldUI").GetComponent<RectTransform>();
+        healthBarImage = _playerWorldUI.GetComponentInChildren<RawImage>();
+
 
         currentHealth.Value = 1.0f;
         currentGold.Value = StartingGold;
@@ -217,7 +221,12 @@ public class PlayerCharacter : NetworkBehaviour,
             cpos.y = Mathf.Lerp(cpos.y, transform.position.y + CameraOffset, 3.0f * Time.deltaTime);
         }
 
+        float ppu = 32.0f;
+        cpos = new Vector3(Mathf.Round(cpos.x *  ppu) / ppu, Mathf.Round(cpos.y * ppu) / ppu, cpos.z);
+        _playerWorldUI.position = new Vector3(Mathf.Round(transform.position.x *  ppu) / ppu, Mathf.Round(transform.position.y * ppu) / ppu, transform.position.z);
+
         _camera.transform.position = cpos;
+
     }
 
     protected virtual void FixedUpdate() {
