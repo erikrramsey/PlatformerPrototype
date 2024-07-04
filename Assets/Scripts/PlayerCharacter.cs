@@ -22,7 +22,7 @@ public class PlayerCharacter : NetworkBehaviour,
 
     [SerializeField] protected GameObject damageNumber;
     [SerializeField] protected GameObject takeDamageNumber;
-    [SerializeField] protected RawImage healthBarImage;
+    [SerializeField] protected Transform healthBarImage;
 
     [SerializeField] protected AnimationClip IdleAnim;
     [SerializeField] protected AnimationClip WalkAnim;
@@ -79,8 +79,6 @@ public class PlayerCharacter : NetworkBehaviour,
         _camera = Camera.main;
         _inputs = new Inputs();
         _hurtbox = GetComponent<CapsuleCollider2D>();
-        _playerWorldUI = GameObject.Find("PlayerWorldUI").GetComponent<RectTransform>();
-        healthBarImage = _playerWorldUI.GetComponentInChildren<RawImage>();
 
 
         currentHealth.Value = 1.0f;
@@ -223,7 +221,7 @@ public class PlayerCharacter : NetworkBehaviour,
 
         float ppu = 32.0f;
         cpos = new Vector3(Mathf.Round(cpos.x *  ppu) / ppu, Mathf.Round(cpos.y * ppu) / ppu, cpos.z);
-        _playerWorldUI.position = new Vector3(Mathf.Round(transform.position.x *  ppu) / ppu, Mathf.Round(transform.position.y * ppu) / ppu, transform.position.z);
+//        _playerWorldUI.position = new Vector3(Mathf.Round(transform.position.x *  ppu) / ppu, Mathf.Round(transform.position.y * ppu) / ppu, transform.position.z);
 
         _camera.transform.position = cpos;
 
@@ -342,8 +340,7 @@ public class PlayerCharacter : NetworkBehaviour,
 
     #region NetVariableCallbacks
     void currentHealth_OnValueChanged(float previous, float current) {
-        healthBarImage.rectTransform.localScale = new Vector3(currentHealth.Value / _stats.GetStat(StatType.MaxHealth), 1.0f, 1.0f);
-        healthBarImage.uvRect = new Rect(0.0f, 0.0f, current / 20.0f, 1.0f);
+        healthBarImage.localScale = new Vector3(currentHealth.Value / _stats.GetStat(StatType.MaxHealth), 1.0f, 1.0f);
 
         if (!IsOwner) return;
         if (current <= 0 && isAlive) {
